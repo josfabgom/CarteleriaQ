@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.log
+uploads/
+.agents/
+backend-api/skills-lock.json
+player-app/www/
+player-app/android/app/build/
+.DS_Store

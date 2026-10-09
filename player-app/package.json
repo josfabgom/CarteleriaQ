@@ -1,0 +1,36 @@
+{
+  "name": "player-app",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "build-web": "node build-web.js"
+  },
+  "build": {
+    "appId": "com.carteleriaq.player",
+    "productName": "CarteleriaQ Player",
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": false
+    }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "electron": "^43.4.1",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.0"
+  }
+}

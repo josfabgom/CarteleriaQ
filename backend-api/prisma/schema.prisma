@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Screen {
+  id            String    @id @default(uuid())
+  name          String
+  location      String?
+  status        String    @default("offline") // online, offline
+  pairingCode   String?   @unique
+  playlist      Playlist? @relation(fields: [playlistId], references: [id], onDelete: SetNull)
+  playlistId    String?
+  layout        String    @default("split") // split, full-media, full-menu
+  transition    String    @default("fade") // fade, slide, zoom
+  mediaDuration Int       @default(10) // duration in seconds per image
+  lastSeenAt    DateTime? // último sync del reproductor
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Playlist {
+  id        String   @id @default(uuid())
+  name      String
+  items     PlaylistItem[]
+  screens   Screen[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PlaylistItem {
+  id         String   @id @default(uuid())
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  mediaId    String?
+  media      Media?   @relation(fields: [mediaId], references: [id])
+  priceListId String?
+  priceList  PriceList? @relation(fields: [priceListId], references: [id])
+  duration   Int      @default(10) // duration in seconds
+  order      Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Media {
+  id        String   @id @default(uuid())
+  name      String
+  type      String   // image, video
+  url       String   // local path or s3 url
+  size      Int?     // bytes
+  items     PlaylistItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PriceList {
+  id        String   @id @default(uuid())
+  name      String
+  items     PriceItem[]
+  playlistItems PlaylistItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PriceItem {
+  id          String   @id @default(uuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  productName String
+  description String?
+  price       Float
+  order       Int      @default(0)
+}
+
+model Product {
+  id           String   @id @default(uuid())
+  internalCode String?  @unique
+  barcode      String?  @unique
+  name         String
+  description  String?
+  price        Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

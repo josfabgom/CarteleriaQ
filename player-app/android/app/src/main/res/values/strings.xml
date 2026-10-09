@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CarteleriaQPlayer</string>
+    <string name="title_activity_main">CarteleriaQPlayer</string>
+    <string name="package_name">com.carteleriaq.player</string>
+    <string name="custom_url_scheme">com.carteleriaq.player</string>
+</resources>

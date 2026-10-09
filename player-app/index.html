@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Player Cartelería Digital</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #000;
+      display: flex;
+    }
+    
+    /* Carrusel de Medios */
+    #media-container {
+      position: relative;
+      overflow: hidden;
+      transition: width 0.5s ease;
+    }
+    
+    #media-container img, #media-container video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      position: absolute;
+      top: 0;
+      left: 0;
+      opacity: 0;
+      z-index: 1;
+    }
+
+    #media-container .active {
+      opacity: 1;
+      z-index: 2;
+    }
+    
+    /* Panel de Precios */
+    #price-container {
+      background-color: #fff;
+      display: flex;
+      flex-direction: column;
+      padding: 30px;
+      box-sizing: border-box;
+      transition: width 0.5s ease;
+      overflow: hidden;
+    }
+
+    /* Layouts */
+    body.layout-split #media-container { width: 60%; }
+    body.layout-split #price-container { width: 40%; }
+    
+    body.layout-full-media #media-container { width: 100%; }
+    body.layout-full-media #price-container { width: 0%; padding: 0; }
+    
+    body.layout-full-menu #media-container { width: 0%; }
+    body.layout-full-menu #price-container { width: 100%; }
+
+    /* Transiciones */
+    /* Fade */
+    body.transition-fade #media-container img, body.transition-fade #media-container video {
+      transition: opacity 1s ease-in-out;
+    }
+
+    /* Slide */
+    body.transition-slide #media-container img, body.transition-slide #media-container video {
+      transform: translateX(100%);
+      transition: transform 1s ease-in-out, opacity 1s ease-in-out;
+    }
+    body.transition-slide #media-container .active {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    /* Zoom (Ken Burns) */
+    body.transition-zoom #media-container img, body.transition-zoom #media-container video {
+      transform: scale(1.1);
+      transition: opacity 1s ease-in-out, transform 10s linear;
+    }
+    body.transition-zoom #media-container .active {
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    .header-precios {
+      font-size: 40px;
+      font-weight: bold;
+      color: #333;
+      border-bottom: 4px solid #e2e8f0;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .price-list {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .price-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 28px;
+      font-weight: 600;
+      color: #4a5568;
+      border-bottom: 1px dashed #cbd5e1;
+      padding-bottom: 15px;
+    }
+
+    .price-name {
+      max-width: 70%;
+    }
+
+    .price-value {
+      color: #16a34a;
+      font-weight: bold;
+      font-size: 32px;
+    }
+  </style>
+</head>
+<body class="layout-split transition-fade">
+
+  <!-- Sección Izquierda: Carrusel -->
+  <div id="media-container">
+    <img src="https://images.unsplash.com/photo-1550547660-d9450f859349?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80" class="media-element active" />
+    <img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80" class="media-element" />
+  </div>
+
+  <!-- Sección Derecha: Precios -->
+  <div id="price-container">
+    <div class="header-precios">Menú de Hoy</div>
+    <div class="price-list" id="price-list-container">
+      <!-- Los precios se inyectarán por JS -->
+    </div>
+  </div>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>

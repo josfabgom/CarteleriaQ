@@ -1,0 +1,31 @@
+codigo_interno,codigo_barra,nombre,descripcion,precio
+ART001,779123456001,Coca-Cola 1.5L,Gaseosa linea Coca-Cola,2500
+ART002,779123456002,Sprite 1.5L,Gaseosa linea Coca-Cola,2400
+ART003,779123456003,Fanta 1.5L,Gaseosa linea Coca-Cola,2400
+ART004,779123456004,Agua Mineral Villavicencio 1.5L,Agua sin gas,1500
+ART005,779123456005,Agua Mineral Villavicencio 1.5L (Gas),Agua con gas,1500
+ART006,779123456006,Cerveza Quilmes 1L,Cerveza clasica rubia,3500
+ART007,779123456007,Cerveza Brahma 1L,Cerveza rubia,3400
+ART008,779123456008,Cerveza Stella Artois 1L,Cerveza premium,4500
+ART009,779123456009,Pizza Muzzarella,Pizza grande al molde 8 porciones,8000
+ART010,779123456010,Pizza Especial,Muzzarella jamon y morrones,9500
+ART011,779123456011,Pizza Napolitana,Muzzarella tomate y ajo,9000
+ART012,779123456012,Pizza Fugazzeta,Muzzarella y cebolla,9200
+ART013,779123456013,Empanada de Carne,Carne cortada a cuchillo frita o al horno,850
+ART014,779123456014,Empanada de Pollo,Pollo desmenuzado,850
+ART015,779123456015,Empanada de Jamon y Queso,Jamon cocido y queso,850
+ART016,779123456016,Hamburguesa Simple,Medallon carne y queso,5000
+ART017,779123456017,Hamburguesa Completa,Jamon queso huevo lechuga tomate,7500
+ART018,779123456018,Hamburguesa Doble Cheddar,Doble carne y doble cheddar,8500
+ART019,779123456019,Papas Fritas Chicas,Porcion chica,2500
+ART020,779123456020,Papas Fritas Grandes,Porcion grande,4000
+ART021,779123456021,Papas Fritas con Cheddar,Papas con cheddar fundido y panceta,5500
+ART022,779123456022,Lomito Simple,Lomo queso y pan,9000
+ART023,779123456023,Lomito Completo,Lomo lechuga tomate huevo jamon queso,12000
+ART024,779123456024,Milanesa de Carne al Plato,Con guarnicion,8500
+ART025,779123456025,Milanesa Napolitana al Plato,Salsa jamon y queso con guarnicion,10500
+ART026,779123456026,Sandwich de Milanesa,Milanesa lechuga tomate,7000
+ART027,779123456027,Ensalada Mixta,Lechuga tomate y cebolla,3000
+ART028,779123456028,Ensalada Caesar,Pollo crutones parmesano aderezo,6500
+ART029,779123456029,Helado 1 Bocha,Sabor a eleccion,1500
+ART030,779123456030,Flan Casero,Flan con dulce de leche o crema,2500
