@@ -40,7 +40,10 @@ services:
       - uploads:/app/uploads # Medios persistentes
       # Reproductor servido en /player (solo los archivos web)
       - ./player-app/index.html:/player-app/index.html:ro
+      - ./player-app/boot.js:/player-app/boot.js:ro
       - ./player-app/renderer.js:/player-app/renderer.js:ro
+      - ./player-app/player.css:/player-app/player.css:ro
+      - ./player-app/manifest.json:/player-app/manifest.json:ro
       - ./player-app/config.js:/player-app/config.js:ro
 
   dashboard:

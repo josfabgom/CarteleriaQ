@@ -1,3 +1,10 @@
+// Lógica del reproductor. Se actualiza por aire (OTA): ver README, sección "Actualizaciones por aire".
+// Versión en ejecución (la define boot.js): "2026-10-09 21:01 UTC [ota]" o "... [apk]"
+const playerVersion = () => {
+  const info = window.__otaInfo || {};
+  return `${info.label || 'sin versión'} [${info.source || 'web'}]`;
+};
+
 // Variables de Estado
 let screenId = localStorage.getItem('screenId');
 let screenToken = localStorage.getItem('screenToken'); // credencial de esta pantalla (la entrega el servidor al vincular)
@@ -95,6 +102,7 @@ function showServerSetup(message, canCancel) {
     </p>
     <p id="setup-msg" style="font-size: 1.1rem; min-height: 3.2em; margin-bottom: 10px; color: #fca5a5; text-align: center; max-width: 800px;"></p>
     <input id="server-input" type="text" inputmode="url" autocomplete="off" placeholder="192.168.1.10" style="padding: 14px; font-size: 1.8rem; width: 520px; max-width: 90vw; color: #000; border-radius: 10px; border: 3px solid transparent; text-align: center;" />
+    <p style="margin-top: 24px; font-size: 0.9rem; color: #93c5fd; opacity: .8;">Reproductor ${playerVersion()}</p>
     <div style="margin-top: 16px; display: flex; gap: 16px;">
       <button id="server-connect" style="padding: 14px 36px; font-size: 1.5rem; border-radius: 10px; border: 3px solid transparent; cursor: pointer; color: #000;">Conectar</button>
       ${canCancel ? '<button id="server-cancel" style="padding: 14px 36px; font-size: 1.5rem; border-radius: 10px; border: 3px solid transparent; cursor: pointer; color: #000;">Cancelar</button>' : ''}
@@ -180,7 +188,7 @@ async function fetchSync() {
     const res = await fetch(`${API_BASE()}/api/screens/${screenId}/sync`, {
       cache: 'no-store',
       signal: controller.signal,
-      headers: { Authorization: `Bearer ${screenToken}` }
+      headers: { Authorization: `Bearer ${screenToken}`, 'X-Player-Version': playerVersion() }
     });
     // 401/404: la pantalla fue borrada o su token ya no vale -> hay que vincular de nuevo
     if (res.status === 401 || res.status === 404) return { status: 'gone' };
@@ -264,6 +272,7 @@ async function initPlayer() {
         <div style="background: #fff; color: #1e3a8a; font-size: 8rem; font-weight: bold; padding: 20px 60px; border-radius: 20px; letter-spacing: 15px;">
           ${pairingCode}
         </div>
+        <p style="margin-top: 40px; font-size: 0.9rem; color: #93c5fd; opacity: .8;">Reproductor ${playerVersion()}</p>
       `;
 
       // Iniciar Polling cada 3 segundos para ver si el admin la vinculó
@@ -556,5 +565,12 @@ function startPlayer(screenData) {
   }
 }
 
+// boot.js no debe reiniciar el reproductor mientras alguien configura el servidor con el control remoto
+window.__playerBusy = () => setupOpen;
+
 // Iniciar
 initPlayer();
+
+// Si llegamos hasta acá sin errores, avisar a boot.js que esta versión arrancó bien
+// (si no confirma a tiempo, boot.js la descarta y vuelve a la versión anterior)
+setTimeout(() => { if (window.__otaConfirm) window.__otaConfirm(); }, 4000);

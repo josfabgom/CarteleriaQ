@@ -50,6 +50,7 @@ model Screen {
   transition    String    @default("fade") // fade, slide, zoom
   mediaDuration Int       @default(10) // duration in seconds per image
   lastSeenAt    DateTime? // último sync del reproductor
+  playerVersion String? // versión del reproductor que informa la TV (ej. "2026-10-09 21:01 UTC [ota]")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }

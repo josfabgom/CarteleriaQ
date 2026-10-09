@@ -67,7 +67,28 @@ Restaurar la base: `gunzip -c backups/db-FECHA.sql.gz | docker compose -f docker
 **Instalar en una TV:** instalá la app *Downloader* en la TV (Android TV / Google TV / Fire TV), abrila y escribí
 `https://carteleriaq.soporteq.tech/download/carteleriaq.apk`. Al terminar la descarga, Android pide permitir "instalar apps desconocidas" para Downloader (se acepta una vez). Alternativas: pendrive USB o `adb install -r carteleriaq.apk`.
 
-**Compilar y publicar una versión nueva** (requiere JDK 21 y el SDK de Android; `ANDROID_HOME`/`JAVA_HOME` definidos y `sdk.dir` en `player-app/android/local.properties`):
+### Actualizaciones por aire (OTA)
+
+El APK lleva un cargador mínimo (`boot.js`) y **el reproductor se actualiza solo desde el servidor**, sin reinstalar nada:
+
+- Qué se actualiza por aire: `renderer.js` (lógica) y `player.css` (diseño). El contenido (precios, listas, imágenes) ya se actualizaba solo.
+- La TV consulta `/player/manifest.json` 20 segundos después de abrirse y cada 10 minutos. Si hay una versión más nueva, la descarga, **verifica su hash SHA-256**, la guarda y se reinicia con ella. Funciona sin cambios en el uso normal: tarda **como máximo 10 minutos** en enterarse.
+- **Reversión automática:** si la versión nueva falla al arrancar (error o cuelgue) dos veces seguidas, la TV la descarta y vuelve a la versión que trae el APK. No vuelve a intentar esa versión; se recupera sola cuando publicás una más nueva.
+- Sin internet, arranca con la última versión descargada. Si se reinstala un APK más viejo que la versión guardada, se conserva la más nueva.
+- El panel muestra la **versión del reproductor de cada pantalla** (ej. `2026-10-09 21:07 UTC [ota]`; `[apk]` = la que trae el APK).
+- Solo hace falta un APK nuevo cuando cambia algo **nativo** de Android (`boot.js`, `index.html`, permisos, `MainActivity`, plugins) o la dirección del servidor.
+
+**Publicar una actualización del reproductor** (después de editar `player-app/renderer.js` o `player.css`):
+
+```bash
+./deploy/deploy-vps.sh root@SERVIDOR    # genera el manifiesto, copia el código y reconstruye en el servidor
+```
+
+El script calcula el hash y sube el número de versión solo si esos archivos cambiaron. Si alterás un archivo sin regenerar el manifiesto, las TVs lo rechazan por no coincidir el hash.
+
+### Compilar y publicar el APK (solo cuando cambie lo nativo)
+
+Requiere JDK 21 y el SDK de Android (`ANDROID_HOME`/`JAVA_HOME` definidos y `sdk.dir` en `player-app/android/local.properties`):
 
 ```bash
 cd player-app
@@ -77,14 +98,24 @@ CARTELERIA_SERVER=https://carteleriaq.soporteq.tech node build-web.js && npx cap
 cd android && ./gradlew assembleDebug
 # APK: player-app/android/app/build/outputs/apk/debug/app-debug.apk
 
-# Publicarlo en el servidor (carpeta downloads/, fuera de git):
-scp app/build/outputs/apk/debug/app-debug.apk root@SERVIDOR:/opt/carteleriaq/downloads/carteleriaq.apk
+# Publicarlo junto con el despliegue:
+cd ../.. && ./deploy/deploy-vps.sh root@SERVIDOR player-app/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 - Es un APK de depuración: sirve para instalar a mano, no para Google Play (eso requiere uno firmado de release).
 - Si se compila sin `CARTELERIA_SERVER`, la TV pregunta la dirección del servidor al primer arranque.
 - Sin servidor, la TV sigue mostrando lo último recibido y muestra "Sin conexión"; con **OK** en el control se puede cambiar el servidor.
 - Para que arranque sola al encender: conceder una vez *Mostrar sobre otras apps* (Ajustes > Apps > Acceso especial).
+
+## Identidad visual (ícono, banner y favicon)
+
+El ícono de la app, el banner de Android TV, la pantalla de arranque y el favicon del panel se generan desde un único diseño en [branding/build-icons.js](branding/build-icons.js):
+
+```bash
+node branding/build-icons.js   # requiere Microsoft Edge o Google Chrome instalado
+```
+
+Escribe los PNG en `player-app/android/app/src/main/res/` y el favicon en `web-dashboard/public/`. Cambiar el ícono es un cambio **nativo**: hay que recompilar y reinstalar el APK. Las fuentes vectoriales de referencia quedan en `branding/icon.svg` y `branding/banner.svg`.
 
 ## Importar productos por CSV
 

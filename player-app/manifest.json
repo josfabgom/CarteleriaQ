@@ -1,0 +1,14 @@
+{
+  "build": 1791580327,
+  "label": "2026-10-09 21:12 UTC",
+  "files": {
+    "renderer.js": {
+      "sha256": "682b39062e369bc1b705f554be61e3f9a4108d3df1ad944cdd2b8a85dd494f5f",
+      "size": 23487
+    },
+    "player.css": {
+      "sha256": "5ee1d927ab2c97664fd63435d1d5bcec85db0df0026cfe62ef8ce155d35a5e8a",
+      "size": 3805
+    }
+  }
+}

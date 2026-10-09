@@ -186,6 +186,12 @@ const ScreenManager = () => {
                 </div>
               </div>
               <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase">Versión del reproductor</label>
+                <div className="bg-gray-50 p-2 rounded text-xs text-gray-600 mt-1 border font-mono truncate" title={screen.playerVersion || ''}>
+                  {screen.playerVersion || 'Aún no informada'}
+                </div>
+              </div>
+              <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase">Contenido Asignado</label>
                 {screen.playlist ? (
                   <div className="mt-1 p-2 bg-green-50 text-green-800 border border-green-200 rounded text-sm">

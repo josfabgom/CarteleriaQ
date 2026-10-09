@@ -1,0 +1,156 @@
+/* Estilos del reproductor. Se actualizan por aire (OTA) junto con renderer.js. */
+/* Todo se dimensiona con --u (1 unidad = 1 px de un lienzo de 1920x1080), así el diseño
+   se ve igual en 720p, 1080p y 4K sin importar la densidad de píxeles del WebView. */
+:root {
+  --u: min(calc(100vw / 1920), calc(100vh / 1080));
+  --list-scale: 1; /* lo ajusta renderer.js para que la lista entre en pantalla */
+  --k: calc(var(--u) * var(--list-scale));
+}
+
+html { font-size: calc(16 * var(--u)); }
+
+body, html {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #000;
+  display: flex;
+}
+
+/* Carrusel de Medios */
+#media-container {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  transition: width 0.5s ease;
+}
+
+#media-container .media-element {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  z-index: 1;
+}
+
+#media-container .active {
+  opacity: 1;
+  z-index: 2;
+}
+
+/* Imágenes: se muestran completas (contain) sobre una copia difuminada que rellena los bordes */
+#media-container .media-element img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+#media-container .media-element img.fg { object-fit: contain; }
+#media-container .media-element img.bg {
+  object-fit: cover;
+  filter: blur(calc(40 * var(--u))) brightness(0.65);
+  transform: scale(1.25);
+}
+
+/* Videos: completos, sobre fondo negro */
+#media-container video.media-element { object-fit: contain; background: #000; }
+
+/* Panel de Precios */
+#price-container {
+  background-color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: calc(30 * var(--u));
+  box-sizing: border-box;
+  transition: width 0.5s ease;
+  overflow: hidden;
+}
+
+/* Layouts */
+body.layout-split #media-container { width: 60%; }
+body.layout-split #price-container { width: 40%; }
+
+body.layout-full-media #media-container { width: 100%; }
+body.layout-full-media #price-container { width: 0%; padding: 0; }
+
+body.layout-full-menu #media-container { width: 0%; }
+body.layout-full-menu #price-container { width: 100%; }
+
+/* Transiciones */
+/* Fade */
+body.transition-fade #media-container .media-element {
+  transition: opacity 1s ease-in-out;
+}
+
+/* Slide */
+body.transition-slide #media-container .media-element {
+  transform: translateX(100%);
+  transition: transform 1s ease-in-out, opacity 1s ease-in-out;
+}
+body.transition-slide #media-container .active {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* Zoom (Ken Burns) */
+body.transition-zoom #media-container .media-element {
+  transform: scale(1.1);
+  transition: opacity 1s ease-in-out, transform 10s linear;
+}
+body.transition-zoom #media-container .active {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.header-precios {
+  font-size: calc(40 * var(--k));
+  font-weight: bold;
+  color: #333;
+  border-bottom: calc(4 * var(--k)) solid #e2e8f0;
+  padding-bottom: calc(20 * var(--k));
+  margin-bottom: calc(30 * var(--k));
+  text-transform: uppercase;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+/* La lista ocupa el alto restante; renderer.js reduce --list-scale hasta que entre
+   y, si aun así no entra, la desplaza sola de arriba hacia abajo. */
+.price-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: calc(20 * var(--k));
+}
+
+.price-item {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: calc(16 * var(--k));
+  font-size: calc(28 * var(--k));
+  font-weight: 600;
+  color: #4a5568;
+  border-bottom: 1px dashed #cbd5e1;
+  padding-bottom: calc(15 * var(--k));
+}
+
+.price-name {
+  max-width: 70%;
+}
+
+.price-value {
+  color: #16a34a;
+  font-weight: bold;
+  font-size: calc(32 * var(--k));
+  white-space: nowrap;
+}

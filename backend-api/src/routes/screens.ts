@@ -111,17 +111,27 @@ router.get('/:id/sync', requireScreenToken, async (req, res) => {
 
     // Registrar actividad sin escribir en la base en cada polling.
     // El token en claro se descarta en el primer sync: la TV ya lo recibió.
+    // Versión del reproductor que informa la TV (solo ASCII imprimible, longitud acotada)
+    const reported = String(req.headers['x-player-version'] || '').replace(/[^ -~]/g, '').slice(0, 64);
+    const versionChanged = !!reported && reported !== screen.playerVersion;
+
     const stale = !screen.lastSeenAt || Date.now() - screen.lastSeenAt.getTime() > LAST_SEEN_THROTTLE_MS;
-    if (stale || screen.pairingCode || screen.pairingToken) {
+    if (stale || screen.pairingCode || screen.pairingToken || versionChanged) {
       await prisma.screen.update({
         where: { id },
-        data: { lastSeenAt: new Date(), status: 'online', pairingCode: null, pairingToken: null }
+        data: {
+          lastSeenAt: new Date(),
+          status: 'online',
+          pairingCode: null,
+          pairingToken: null,
+          ...(versionChanged ? { playerVersion: reported } : {})
+        }
       });
     }
 
     // Se excluyen los campos que cambian en cada sync para que el reproductor
     // no detecte un "cambio" y reinicie la reproducción innecesariamente.
-    const { lastSeenAt, status, pairingCode, pairingToken, tokenHash, businessId, ...config } = screen;
+    const { lastSeenAt, status, pairingCode, pairingToken, tokenHash, businessId, playerVersion, ...config } = screen;
     res.json(config);
   } catch (error) {
     res.status(500).json({ error: 'Error syncing screen' });
