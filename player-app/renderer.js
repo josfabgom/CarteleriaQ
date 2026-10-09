@@ -25,9 +25,13 @@ pairingContainer.style.zIndex = '9999';
 pairingContainer.style.fontFamily = 'sans-serif';
 document.body.appendChild(pairingContainer);
 
-let serverIp = localStorage.getItem('serverIp') || (window.location.protocol === 'file:' || window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-  ? 'http://localhost:3000'
-  : window.location.origin);
+// Orden: IP guardada > config.js (CARTELERIA_SERVER) > mismo origen del reproductor.
+// En la app nativa (APK) no hay servidor en el origen, así que se pregunta al primer arranque.
+const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const isLocalOrigin = window.location.protocol === 'file:' || /localhost|127\.0\.0\.1/.test(window.location.origin);
+let serverIp = localStorage.getItem('serverIp')
+  || (window.CARTELERIA_SERVER || '').trim()
+  || (isNativeApp ? '' : (isLocalOrigin ? 'http://localhost:3000' : window.location.origin));
 
 const API_BASE = () => serverIp;
 
@@ -41,10 +45,105 @@ const CONFIG_CACHE_KEY = 'lastConfig';
 
 // Indicador discreto de "sin conexión" (el contenido sigue reproduciéndose)
 const offlineBadge = document.createElement('div');
-offlineBadge.textContent = 'Sin conexión';
+offlineBadge.textContent = 'Sin conexión · OK para cambiar servidor';
 offlineBadge.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:9000;padding:4px 10px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font:12px sans-serif;display:none;pointer-events:none';
 document.body.appendChild(offlineBadge);
 const setOffline = (offline) => { offlineBadge.style.display = offline ? 'block' : 'none'; };
+
+// ---- Configuración del servidor (útil con control remoto: se escribe una sola vez) ----
+let setupOpen = false;
+
+function normalizeServerUrl(raw) {
+  let v = raw.trim().replace(/\/+$/, '');
+  if (!v) return '';
+  if (!/^https?:\/\//i.test(v)) v = 'http://' + v;
+  const hostPart = v.replace(/^https?:\/\//i, '');
+  if (/^http:/i.test(v) && !/:\d+$/.test(hostPart)) v += ':3000'; // puerto por defecto del backend
+  return v;
+}
+
+async function testServer(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(`${url}/api/health`, { signal: controller.signal, cache: 'no-store' });
+    return res.ok;
+  } catch (e) {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function showServerSetup(message, canCancel) {
+  setupOpen = true;
+  pairingContainer.style.display = 'flex';
+  pairingContainer.innerHTML = `
+    <h1 style="font-size: 2.5rem; margin-bottom: 16px;">Conectar con el servidor</h1>
+    <p style="font-size: 1.3rem; margin-bottom: 8px; color: #93c5fd; text-align: center; max-width: 800px;">
+      Escribe la dirección IP de la PC donde corre Cartelería Q (ej. 192.168.1.10).<br>El puerto 3000 se agrega solo.
+    </p>
+    <p id="setup-msg" style="font-size: 1.2rem; min-height: 1.6em; margin-bottom: 16px; color: #fca5a5; text-align: center; max-width: 800px;"></p>
+    <input id="server-input" type="text" inputmode="url" autocomplete="off" style="padding: 14px; font-size: 1.8rem; width: 520px; max-width: 90vw; color: #000; border-radius: 10px; border: 3px solid transparent; text-align: center;" />
+    <div style="margin-top: 24px; display: flex; gap: 16px;">
+      <button id="server-connect" style="padding: 14px 36px; font-size: 1.5rem; border-radius: 10px; border: 3px solid transparent; cursor: pointer; color: #000;">Conectar</button>
+      ${canCancel ? '<button id="server-cancel" style="padding: 14px 36px; font-size: 1.5rem; border-radius: 10px; border: 3px solid transparent; cursor: pointer; color: #000;">Cancelar</button>' : ''}
+    </div>
+  `;
+  const input = document.getElementById('server-input');
+  const msg = document.getElementById('setup-msg');
+  const connectBtn = document.getElementById('server-connect');
+  const cancelBtn = document.getElementById('server-cancel');
+  msg.textContent = message || '';
+  input.value = serverIp || 'http://192.168.1.';
+
+  // Resaltar el elemento enfocado (navegación con el D-pad del control)
+  pairingContainer.querySelectorAll('input, button').forEach((el) => {
+    el.addEventListener('focus', () => { el.style.borderColor = '#facc15'; });
+    el.addEventListener('blur', () => { el.style.borderColor = 'transparent'; });
+  });
+
+  const connect = async () => {
+    const url = normalizeServerUrl(input.value);
+    if (!url) { msg.textContent = 'Escribe una dirección.'; return; }
+    connectBtn.disabled = true;
+    msg.style.color = '#93c5fd';
+    msg.textContent = `Probando ${url}…`;
+    if (await testServer(url)) {
+      localStorage.setItem('serverIp', url);
+      serverIp = url;
+      setupOpen = false;
+      if (syncInterval) clearTimeout(syncInterval);
+      syncInterval = null;
+      currentSyncData = null;
+      pairingContainer.innerHTML = '';
+      initPlayer();
+    } else {
+      connectBtn.disabled = false;
+      msg.style.color = '#fca5a5';
+      msg.textContent = `No se pudo conectar a ${url}. Revisa la IP, que el servidor esté encendido y que estén en la misma red.`;
+      input.focus();
+    }
+  };
+
+  connectBtn.onclick = connect;
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); connect(); } });
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      setupOpen = false;
+      pairingContainer.style.display = 'none';
+    };
+  }
+  input.focus();
+  input.select();
+}
+
+// Con el servidor caído, "OK" en el control abre la configuración (por si cambió la IP)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && offlineBadge.style.display === 'block' && !setupOpen) {
+    showServerSetup('', true);
+  }
+});
 
 // Última configuración recibida, para poder reproducir sin servidor
 function saveCachedConfig(data) {
@@ -86,7 +185,7 @@ async function syncLoop(failures = 0) {
   let nextFailures = 0;
   if (result.status === 'ok') {
     setOffline(false);
-    pairingContainer.style.display = 'none';
+    if (!setupOpen) pairingContainer.style.display = 'none';
     if (JSON.stringify(result.data) !== JSON.stringify(currentSyncData)) {
       saveCachedConfig(result.data);
       startPlayer(result.data);
@@ -95,7 +194,7 @@ async function syncLoop(failures = 0) {
     nextFailures = failures + 1;
     setOffline(true);
     // Primer arranque sin red: reproducir lo último guardado
-    if (!currentSyncData) {
+    if (!currentSyncData && !setupOpen) {
       const cached = loadCachedConfig();
       if (cached) {
         pairingContainer.style.display = 'none';
@@ -120,6 +219,7 @@ function startSyncLoop() {
 
 // Función para inicializar o mostrar pantalla de vinculación
 async function initPlayer() {
+  if (!serverIp) return showServerSetup();
   if (isPaired) {
     startSyncLoop();
   } else {
@@ -163,27 +263,7 @@ async function initPlayer() {
       }, 3000);
 
     } catch (e) {
-      pairingContainer.innerHTML = `
-        <h2>Error de conexión con el servidor.</h2>
-        <p style="margin-top: 10px; color: #93c5fd;">Servidor actual: ${serverIp}</p>
-        <div style="margin-top: 20px;">
-           <input id="ip-input" type="text" value="${serverIp}" style="padding: 10px; font-size: 1.2rem; width: 300px; color: black;" />
-           <button id="save-ip-btn" style="padding: 10px 20px; font-size: 1.2rem; cursor: pointer; color: black; border-radius: 8px; margin-left: 10px;">Guardar y Conectar</button>
-        </div>
-      `;
-      document.getElementById('save-ip-btn').onclick = () => {
-        const newIp = document.getElementById('ip-input').value;
-        if (newIp) {
-          document.getElementById('save-ip-btn').innerText = "Conectando...";
-          document.getElementById('save-ip-btn').disabled = true;
-          localStorage.setItem('serverIp', newIp);
-          serverIp = newIp;
-          initPlayer();
-        }
-      };
-      setTimeout(() => {
-        if (!document.getElementById('save-ip-btn')) initPlayer();
-      }, 5000);
+      showServerSetup('No se pudo conectar con el servidor.');
     }
   }
 }

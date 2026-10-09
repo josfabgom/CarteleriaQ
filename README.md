@@ -42,6 +42,19 @@ Una pantalla figura *online* si sincronizó en los últimos 2 minutos. Los códi
 
 Columnas: `nombre,precio` (obligatorias), `codigo_interno,codigo_barra,descripcion` (opcionales). Ver `articulos_importacion.csv`. Si existe un producto con el mismo código interno o de barras, se actualiza.
 
+## Reproductor Android TV (APK)
+
+```bash
+cd player-app
+npm install
+npm run build-web && npx cap sync android
+# abrir player-app/android en Android Studio -> Build APK
+```
+
+- La IP del servidor se pregunta al primer arranque (basta escribir `192.168.1.10`; el puerto 3000 se agrega solo). Se prueba la conexión antes de guardar. Para fijarla de fábrica, editar `player-app/config.js` (`CARTELERIA_SERVER`) antes de compilar.
+- Si el servidor deja de responder, la TV sigue mostrando lo último recibido y muestra "Sin conexión"; con **OK** en el control se puede cambiar el servidor.
+- Para que arranque sola al encender la TV, conceder una vez *Mostrar sobre otras apps* a la app (Ajustes > Apps > Acceso especial).
+
 ## Pendiente
 
 - Autenticación del dashboard y de la API (hoy es abierta: usar solo en red de confianza).
