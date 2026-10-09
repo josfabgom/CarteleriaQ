@@ -30,7 +30,11 @@ docker compose up --build
 Pruebas de integración del multi-negocio (aislamiento de datos, cuotas, tokens de TV): con el backend en marcha,
 
 ```bash
-cd backend-api && node scripts/test-multitenant.js
+cd backend-api
+node scripts/test-multitenant.js        # aislamiento entre negocios, cuotas, tokens, importación CSV
+node scripts/test-pricing-api.js       # artículos, listas enlazadas, ajuste masivo, programador (tarda ~1 min)
+npx tsx scripts/test-csv.ts            # lector de CSV
+npx tsx scripts/test-pricing.ts        # cálculo y redondeo de precios
 ```
 
 ## Despliegue en un VPS (Hostinger u otro con Ubuntu)
@@ -117,13 +121,13 @@ node branding/build-icons.js   # requiere Microsoft Edge o Google Chrome instala
 
 Escribe los PNG en `player-app/android/app/src/main/res/` y el favicon en `web-dashboard/public/`. Cambiar el ícono es un cambio **nativo**: hay que recompilar y reinstalar el APK. Las fuentes vectoriales de referencia quedan en `branding/icon.svg` y `branding/banner.svg`.
 
+## Precios, fotos y estilos de menú
+
+Cada artículo tiene unidad de venta (kg, unidad…), categoría, precio anterior (tachado), etiqueta (OFERTA, NUEVO…), stock y foto. Las listas de pantalla se **enlazan** al catálogo, así que un cambio de precio, foto o stock llega solo a todas las pantallas. Hay tres estilos de menú (lista, lista con fotos, tarjetas con fotos) y un **ajuste masivo de precios** (porcentaje o monto fijo, redondeo, por categoría, programable, con historial y deshacer). Sirve para cualquier rubro: gastronomía, carnicería, ferretería, etc. Detalle en [docs/AJUSTE-DE-PRECIOS.md](docs/AJUSTE-DE-PRECIOS.md).
+
 ## Importar productos por CSV
 
-Columnas: `nombre` y `precio` (obligatorias), `codigo_interno`, `codigo_barra` y `descripcion` (opcionales). Acepta separador coma, punto y coma (Excel en español) o tabulador, UTF-8 con o sin BOM, y precios como `9500`, `9.500` o `$ 9.500,50`. Si el negocio ya tiene un artículo con el mismo código interno o de barras, se actualiza. El panel muestra cuántos se crearon/actualizaron y qué filas se rechazaron. Detalle completo en [docs/FORMATO-CATALOGO.md](docs/FORMATO-CATALOGO.md) (ejemplo: [docs/ejemplo-catalogo.csv](docs/ejemplo-catalogo.csv)).
-
-## Pantallas de TV (resoluciones y listas largas)
-
-El reproductor dimensiona todo en proporción al tamaño de la pantalla, así que se ve igual en 720p, 1080p y 4K. La lista de precios se achica sola hasta un 70% para que entren todos los artículos y, si son demasiados, se desplaza sola de arriba hacia abajo. Las imágenes se muestran completas (sin recortar) sobre una copia difuminada que rellena los bordes. Para el 4K conviene subir imágenes de 1920x1080 o mayores y videos H.264 de 1080p (los de 4K exigen mucho a los equipos baratos).
+Columnas: `nombre` y `precio` (obligatorias); `codigo_interno`, `codigo_barra`, `descripcion`, `categoria`, `unidad`, `precio_anterior`, `etiqueta` y `disponible` (opcionales). Acepta separador coma, punto y coma (Excel en español) o tabulador, UTF-8 con o sin BOM, y precios como `9500`, `9.500` o `$ 9.500,50`. Si el negocio ya tiene un artículo con el mismo código interno o de barras, se actualiza, y una columna ausente en el archivo no borra ese dato. El panel muestra cuántos se crearon/actualizaron y qué filas se rechazaron. Detalle completo en [docs/FORMATO-CATALOGO.md](docs/FORMATO-CATALOGO.md) (ejemplos: [gastronomía](docs/ejemplo-catalogo.csv) y [carnicería](docs/ejemplo-carniceria.csv)).
 
 ## Seguridad: qué está y qué falta
 

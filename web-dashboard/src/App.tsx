@@ -5,6 +5,7 @@ import BusinessManager from './components/BusinessManager';
 import Login from './components/Login';
 import MediaUpload from './components/MediaUpload';
 import PriceListManager from './components/PriceListManager';
+import PricingManager from './components/PricingManager';
 import ProductManager from './components/ProductManager';
 import ScreenManager from './components/ScreenManager';
 
@@ -13,6 +14,7 @@ const BUSINESS_NAV = [
   { id: 'pantallas', label: 'Pantallas' },
   { id: 'medios', label: 'Medios & Promociones' },
   { id: 'articulos', label: 'Catálogo de Artículos' },
+  { id: 'ajuste', label: 'Ajuste de precios' },
   { id: 'precios', label: 'Listas de Pantalla' },
   { id: 'cuenta', label: 'Mi cuenta' }
 ];
@@ -150,22 +152,26 @@ const App = () => {
                 <p className="text-gray-600 mt-2">Selecciona un módulo en el menú lateral para comenzar a administrar el contenido de tus pantallas.</p>
               </header>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
                 <div onClick={() => setActiveTab('pantallas')} className="bg-white p-6 shadow-sm rounded-lg border border-gray-100 cursor-pointer hover:shadow-md transition">
                   <h3 className="text-lg font-semibold mb-2 text-blue-600">Pantallas</h3>
                   <p className="text-gray-500 text-sm">Gestiona los dispositivos conectados y su programación.</p>
                 </div>
                 <div onClick={() => setActiveTab('medios')} className="bg-white p-6 shadow-sm rounded-lg border border-gray-100 cursor-pointer hover:shadow-md transition">
                   <h3 className="text-lg font-semibold mb-2 text-blue-600">Medios</h3>
-                  <p className="text-gray-500 text-sm">Sube imágenes y videos (Promociones).</p>
+                  <p className="text-gray-500 text-sm">Subí imágenes y videos para tus promociones.</p>
                 </div>
                 <div onClick={() => setActiveTab('articulos')} className="bg-white p-6 shadow-sm rounded-lg border border-gray-100 cursor-pointer hover:shadow-md transition">
                   <h3 className="text-lg font-semibold mb-2 text-blue-600">Artículos</h3>
-                  <p className="text-gray-500 text-sm">Administra tu inventario y precios base (ABM general).</p>
+                  <p className="text-gray-500 text-sm">Tus artículos con foto, unidad, categoría y precio.</p>
+                </div>
+                <div onClick={() => setActiveTab('ajuste')} className="bg-white p-6 shadow-sm rounded-lg border border-gray-100 cursor-pointer hover:shadow-md transition">
+                  <h3 className="text-lg font-semibold mb-2 text-blue-600">Ajuste de precios</h3>
+                  <p className="text-gray-500 text-sm">Subí o bajá precios por porcentaje, con redondeo, programado y con deshacer.</p>
                 </div>
                 <div onClick={() => setActiveTab('precios')} className="bg-white p-6 shadow-sm rounded-lg border border-gray-100 cursor-pointer hover:shadow-md transition">
                   <h3 className="text-lg font-semibold mb-2 text-blue-600">Listas</h3>
-                  <p className="text-gray-500 text-sm">Crea listas de precios específicas para pantallas vía CSV.</p>
+                  <p className="text-gray-500 text-sm">Armá las listas que se muestran en cada pantalla.</p>
                 </div>
               </div>
             </div>
@@ -188,6 +194,12 @@ const App = () => {
             <div>
               <h2 className="text-2xl font-bold text-gray-800 mb-6">Inventario Global</h2>
               <ProductManager />
+            </div>
+          )}
+
+          {activeTab === 'ajuste' && !isAdmin && (
+            <div>
+              <PricingManager />
             </div>
           )}
 

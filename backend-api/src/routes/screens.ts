@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import prisma from '../prisma';
 import { bid, randomToken, requireBusiness, requireScreenToken, sha256 } from '../auth';
+import { PRODUCT_WITH_IMAGE, resolveItems } from '../menu';
 
 const router = Router();
 
@@ -99,7 +100,7 @@ router.get('/:id/sync', requireScreenToken, async (req, res) => {
         playlist: {
           include: {
             items: {
-              include: { media: true, priceList: { include: { items: true } } },
+              include: { media: true, priceList: { include: { items: { include: { product: PRODUCT_WITH_IMAGE }, orderBy: [{ order: 'asc' }, { productName: 'asc' }] } } } },
               orderBy: { order: 'asc' }
             }
           }
@@ -132,7 +133,16 @@ router.get('/:id/sync', requireScreenToken, async (req, res) => {
     // Se excluyen los campos que cambian en cada sync para que el reproductor
     // no detecte un "cambio" y reinicie la reproducción innecesariamente.
     const { lastSeenAt, status, pairingCode, pairingToken, tokenHash, businessId, playerVersion, ...config } = screen;
-    res.json(config);
+
+    // Los artículos enlazados al catálogo se envían con sus datos vivos (precio, foto, unidad, etiqueta…)
+    // y los campos de siempre (productName, price, description) para que reproductores anteriores sigan funcionando.
+    const playlist = config.playlist && {
+      ...config.playlist,
+      items: config.playlist.items.map((entry) =>
+        entry.priceList ? { ...entry, priceList: { ...entry.priceList, items: resolveItems(entry.priceList) } } : entry
+      )
+    };
+    res.json({ ...config, playlist });
   } catch (error) {
     res.status(500).json({ error: 'Error syncing screen' });
   }
@@ -187,6 +197,7 @@ router.post('/:id/assign', requireBusiness, async (req, res) => {
     const id = String(req.params.id);
     const businessId = bid(req);
     const { priceListId, mediaIds, layout, transition, mediaDuration } = req.body;
+    const menuStyle = ['list', 'photo-list', 'cards'].includes(req.body.menuStyle) ? req.body.menuStyle : 'list';
 
     const screen = await prisma.screen.findFirst({ where: { id, businessId } });
     if (!screen) return res.status(404).json({ error: 'Screen not found' });
@@ -227,6 +238,7 @@ router.post('/:id/assign', requireBusiness, async (req, res) => {
         playlistId,
         layout: layout || 'split',
         transition: transition || 'fade',
+        menuStyle,
         mediaDuration: duration
       }
     });

@@ -1,9 +1,7 @@
-codigo_interno,codigo_barra,nombre,descripcion,precio
-PIZ001,,Pizza Muzzarella,"Salsa de tomate, muzzarella y aceitunas",9500
-PIZ002,,Pizza Fugazzeta,Cebolla caramelizada y muzzarella,11500
-HAM001,,Hamburguesa Completa,"Carne 200 g, cheddar, huevo y panceta",8900
-LOM001,,Lomito Completo,Con papas fritas,12500
-MIL001,,Milanesa Napolitana,Jamón y muzzarella gratinada,11900
-EMP001,,Empanada de Carne,Cortada a cuchillo (unidad),1400
-BEB001,7791813421007,Gaseosa 500 ml,Línea Coca-Cola,2200
-POS001,,Flan con Dulce de Leche,Casero con crema,3500
+codigo_interno,nombre,descripcion,precio,categoria,unidad,precio_anterior,etiqueta,disponible
+PIZ001,Pizza Muzzarella,"Salsa de tomate, muzzarella y aceitunas",9500,Pizzas,unidad,,,si
+PIZ002,Pizza Fugazzeta,Cebolla caramelizada y muzzarella,11500,Pizzas,unidad,12500,OFERTA,si
+HAM001,Hamburguesa Completa,"Carne 200 g, cheddar, huevo y panceta",8900,Hamburguesas,unidad,,NUEVO,si
+EMP001,Empanada de Carne,Cortada a cuchillo,1400,Empanadas,unidad,,,si
+BEB001,Gaseosa 500 ml,Línea Coca-Cola,2200,Bebidas,unidad,,,si
+POS001,Flan con Dulce de Leche,Casero con crema,3500,Postres,porción,,,no

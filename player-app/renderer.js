@@ -338,8 +338,15 @@ if (CACHE_ENABLED && navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().catch(() => {});
 }
 
-const collectMediaUrls = (config) =>
-  (config.playlist?.items || []).filter((i) => i.media).map((i) => i.media.url);
+const collectMediaUrls = (config) => {
+  const urls = new Set();
+  for (const entry of config.playlist?.items || []) {
+    if (entry.media) urls.add(entry.media.url);
+    // fotos de los artículos del menú
+    for (const item of entry.priceList?.items || []) if (item.imageUrl) urls.add(item.imageUrl);
+  }
+  return [...urls];
+};
 
 async function syncMediaCache(urls) {
   if (!CACHE_ENABLED || mediaSyncRunning) return;
@@ -428,6 +435,177 @@ function formatPrice(value) {
   return '$' + int.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? ',' + dec : '');
 }
 
+// ---- Menú: estilos "list" (lista), "photo-list" (lista con fotos) y "cards" (tarjetas) ----
+const BADGE_COLORS = { OFERTA: '#dc2626', NUEVO: '#2563eb', AGOTADO: '#6b7280', DESTACADO: '#d97706' };
+
+const itemBadge = (item) => (item.available === false ? 'AGOTADO' : (item.badge || ''));
+const itemName = (item) => item.name || item.productName || '';
+
+function makeBadge(text) {
+  const b = document.createElement('span');
+  b.className = 'badge';
+  b.textContent = text;
+  b.style.background = BADGE_COLORS[text.toUpperCase()] || '#ea580c';
+  return b;
+}
+
+// Precio con unidad de venta ("$12.000 / kg") y, si hay oferta, el precio anterior tachado
+function makePriceBox(item) {
+  const box = document.createElement('div');
+  box.className = 'price-box';
+  const old = Number(item.oldPrice);
+  if (Number.isFinite(old) && old > Number(item.price)) {
+    const o = document.createElement('span');
+    o.className = 'old-price';
+    o.textContent = formatPrice(old);
+    box.appendChild(o);
+  }
+  const main = document.createElement('span');
+  main.className = 'price-main';
+  main.textContent = formatPrice(item.price);
+  box.appendChild(main);
+  const unit = (item.unit || '').trim();
+  if (unit && !['unidad', 'u', 'un'].includes(unit.toLowerCase())) {
+    const u = document.createElement('span');
+    u.className = 'price-unit';
+    u.textContent = '/ ' + unit;
+    box.appendChild(u);
+  }
+  return box;
+}
+
+// Imagen (o inicial del nombre si no hay foto). La fuente real se asigna después, con soporte sin conexión.
+function makePhoto(item, className, pending) {
+  if (!item.imageUrl) {
+    const ph = document.createElement('div');
+    ph.className = 'placeholder ' + className;
+    ph.textContent = (itemName(item).trim().charAt(0) || '?').toUpperCase();
+    return ph;
+  }
+  const img = document.createElement('img');
+  img.className = className;
+  img.alt = '';
+  pending.push([img, item.imageUrl]);
+  return img;
+}
+
+// Agrupa por categoría (en orden de aparición) si la lista lo pide y hay categorías
+function groupItems(items, groupByCategory) {
+  if (!groupByCategory || !items.some((i) => i.category)) return [{ title: null, items }];
+  const groups = new Map();
+  for (const item of items) {
+    const key = item.category || 'Otros';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  return [...groups].map(([title, list]) => ({ title, items: list }));
+}
+
+const isFullMenu = () => document.body.classList.contains('layout-full-menu');
+const baseCardColumns = (n) => (isFullMenu() ? (n <= 4 ? 2 : n <= 9 ? 3 : 4) : (n <= 2 ? 1 : n <= 8 ? 2 : 3));
+
+// Tarjetas: se prueba con más columnas antes de achicar las fotos o recurrir al desplazamiento automático
+function renderCards(priceList) {
+  const base = baseCardColumns((priceList.items || []).length);
+  const maxCols = isFullMenu() ? 5 : 3;
+  for (let cols = base; cols <= maxCols; cols++) {
+    renderMenu(priceList, 'cards', cols);
+    const fit = fitPriceList();
+    if (!fit.overflow && fit.scale >= 0.85) return; // entra bien
+  }
+  // No entra aunque se use el máximo de columnas: queda con desplazamiento automático
+}
+
+function renderMenu(priceList, style, forcedCols) {
+  const items = priceList.items || [];
+  const groups = groupItems(items, priceList.groupByCategory);
+  const pending = [];
+
+  priceListContainer.className = 'price-list style-' + style;
+  priceListContainer.innerHTML = '';
+
+  if (style === 'cards') {
+    // Columnas y alto de foto según la cantidad de artículos y el ancho del panel
+    const cols = forcedCols || baseCardColumns(items.length);
+    const rows = groups.reduce((sum, g) => sum + Math.ceil(g.items.length / cols), 0);
+    const titlesHeight = groups.filter((g) => g.title).length * 56;
+    // La foto ocupa lo que sobra del alto disponible, con un mínimo para que se reconozca el producto
+    const photoH = Math.max(110, Math.min(340, (870 - titlesHeight - (rows - 1) * 18) / rows - 130));
+    priceListContainer.style.setProperty('--cols', cols);
+    priceListContainer.style.setProperty('--photo-h', Math.round(photoH));
+  }
+
+  for (const group of groups) {
+    const wrap = document.createElement('div');
+    wrap.className = 'menu-group';
+    if (group.title) {
+      const title = document.createElement('div');
+      title.className = 'category-title';
+      title.textContent = group.title;
+      wrap.appendChild(title);
+    }
+    const list = document.createElement('div');
+    list.className = 'menu-items';
+
+    for (const item of group.items) {
+      const badge = itemBadge(item);
+      const el = document.createElement('div');
+      const unavailable = item.available === false;
+
+      if (style === 'cards') {
+        el.className = 'menu-card' + (unavailable ? ' unavailable' : '');
+        const photo = document.createElement('div');
+        photo.className = 'card-photo';
+        photo.appendChild(makePhoto(item, 'card-img', pending));
+        if (badge) photo.appendChild(makeBadge(badge));
+        const body = document.createElement('div');
+        body.className = 'card-body';
+        const name = document.createElement('div');
+        name.className = 'item-name';
+        name.textContent = itemName(item);
+        body.appendChild(name);
+        if (item.description) {
+          const d = document.createElement('div');
+          d.className = 'item-desc';
+          d.textContent = item.description;
+          body.appendChild(d);
+        }
+        body.appendChild(makePriceBox(item));
+        el.append(photo, body);
+      } else if (style === 'photo-list') {
+        el.className = 'menu-row' + (unavailable ? ' unavailable' : '');
+        const info = document.createElement('div');
+        info.className = 'info';
+        const name = document.createElement('div');
+        name.className = 'item-name';
+        name.textContent = itemName(item);
+        if (badge) name.appendChild(makeBadge(badge));
+        info.appendChild(name);
+        if (item.description) {
+          const d = document.createElement('div');
+          d.className = 'item-desc';
+          d.textContent = item.description;
+          info.appendChild(d);
+        }
+        el.append(makePhoto(item, 'thumb', pending), info, makePriceBox(item));
+      } else {
+        el.className = 'price-item' + (unavailable ? ' unavailable' : '');
+        const name = document.createElement('div');
+        name.className = 'price-name';
+        name.textContent = itemName(item);
+        if (badge) name.appendChild(makeBadge(badge));
+        el.append(name, makePriceBox(item));
+      }
+      list.appendChild(el);
+    }
+    wrap.appendChild(list);
+    priceListContainer.appendChild(wrap);
+  }
+
+  // Las fotos se asignan con el elemento ya en pantalla (usa la copia local si existe)
+  for (const [img, url] of pending) attachMedia(img, url);
+}
+
 // Hace entrar la lista de precios en el alto de la pantalla: primero reduce el tamaño de letra
 // (hasta 70%) y, si aun así no cabe (listas muy largas), la desplaza sola de arriba hacia abajo.
 let listScrollTimer = null;
@@ -455,6 +633,7 @@ function fitPriceList() {
       else if (direction === -1 && priceListContainer.scrollTop <= 0) { pause = 100; direction = 1; }
     }, 30);
   }
+  return { scale, overflow: priceListContainer.scrollHeight > priceListContainer.clientHeight + 1 };
 }
 
 // Reajustar si cambia el tamaño de la ventana o terminan de cargar las fuentes
@@ -480,19 +659,9 @@ function startPlayer(screenData) {
     const headerTitle = document.querySelector('.header-precios');
     if (headerTitle) headerTitle.innerText = priceListItem.priceList.name || 'Menú de Hoy';
 
-    const items = priceListItem.priceList.items || [];
-    items.forEach(item => {
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'price-item';
-      const name = document.createElement('div');
-      name.className = 'price-name';
-      name.textContent = item.productName || item.name || '';
-      const value = document.createElement('div');
-      value.className = 'price-value';
-      value.textContent = formatPrice(item.price);
-      itemDiv.append(name, value);
-      priceListContainer.appendChild(itemDiv);
-    });
+    const style = ['list', 'photo-list', 'cards'].includes(screenData.menuStyle) ? screenData.menuStyle : 'list';
+    if (style === 'cards') renderCards(priceListItem.priceList);
+    else renderMenu(priceListItem.priceList, style);
   }
   fitPriceList();
 

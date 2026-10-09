@@ -20,6 +20,7 @@ const ScreenManager = () => {
   const [selectedLayout, setSelectedLayout] = useState('split');
   const [selectedTransition, setSelectedTransition] = useState('fade');
   const [mediaDuration, setMediaDuration] = useState(10);
+  const [selectedMenuStyle, setSelectedMenuStyle] = useState('list');
 
   const fetchScreens = async () => {
     try {
@@ -82,6 +83,7 @@ const ScreenManager = () => {
     setSelectedLayout(screen?.layout || 'split');
     setSelectedTransition(screen?.transition || 'fade');
     setMediaDuration(screen?.mediaDuration || 10);
+    setSelectedMenuStyle(screen?.menuStyle || 'list');
     
     // Fetch options
     const [resPL, resMedia] = await Promise.all([
@@ -107,7 +109,8 @@ const ScreenManager = () => {
           mediaIds: selectedMedia,
           layout: selectedLayout,
           transition: selectedTransition,
-          mediaDuration: mediaDuration
+          mediaDuration: mediaDuration,
+          menuStyle: selectedMenuStyle
         })
       });
       setShowModal(false);
@@ -297,6 +300,19 @@ const ScreenManager = () => {
                     <option key={pl.id} value={pl.id}>{pl.name}</option>
                   ))}
                 </select>
+                <div className="mt-3">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Estilo de la lista en pantalla</label>
+                  <select
+                    value={selectedMenuStyle}
+                    onChange={e => setSelectedMenuStyle(e.target.value)}
+                    className="w-full border p-2 rounded text-sm bg-white"
+                  >
+                    <option value="list">Lista (nombre y precio)</option>
+                    <option value="photo-list">Lista con fotos</option>
+                    <option value="cards">Tarjetas con fotos</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Las fotos, la unidad de venta, las etiquetas y los precios tachados salen de cada artículo del catálogo.</p>
+                </div>
               </div>
 
               <div>

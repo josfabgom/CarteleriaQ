@@ -15,6 +15,8 @@ import mediaRoutes from './routes/media';
 import playlistsRoutes from './routes/playlists';
 import priceListsRoutes from './routes/priceLists';
 import productsRoutes from './routes/products';
+import pricingRoutes from './routes/pricing';
+import { startPriceScheduler } from './pricing';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -41,6 +43,7 @@ app.use('/api/media', mediaRoutes);
 app.use('/api/playlists', playlistsRoutes);
 app.use('/api/pricelists', priceListsRoutes);
 app.use('/api/products', productsRoutes);
+app.use('/api/pricing', pricingRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -53,7 +56,10 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 });
 
 ensureSuperadmin()
-  .then(() => app.listen(port, () => console.log(`Backend API running on port ${port}`)))
+  .then(() => app.listen(port, () => {
+    console.log(`Backend API running on port ${port}`);
+    startPriceScheduler(); // aplica los cambios de precios programados
+  }))
   .catch((err) => {
     console.error(err.message);
     process.exit(1);

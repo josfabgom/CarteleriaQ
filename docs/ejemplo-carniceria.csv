@@ -1,0 +1,10 @@
+codigo_interno;nombre;descripcion;precio;categoria;unidad;precio_anterior;etiqueta;disponible
+V01;Asado de tira;Corte tradicional, ideal para parrilla;12.900;Vacuno;kg;14.500;OFERTA;si
+V02;Vacío;Jugoso, con su grasa;15.800;Vacuno;kg;;;si
+V03;Bife de chorizo;Grueso, de primera;17.900;Vacuno;kg;;NUEVO;si
+V04;Costilla;Para horno o parrilla;9.800;Vacuno;kg;;;no
+P01;Pollo entero;Fresco, de granja;4.600;Pollo;kg;5.200;OFERTA;si
+C01;Bondiola;Tierna, ideal al horno;9.200;Cerdo;kg;;;si
+E01;Chorizo parrillero;Elaboración propia;7.200;Embutidos;kg;;NUEVO;si
+E03;Salchicha parrillera;Tira de 6 unidades;3.800;Embutidos;tira;;;si
+A01;Carbón 3 kg;Bolsa de carbón vegetal;2.900;Almacén;unidad;;;si

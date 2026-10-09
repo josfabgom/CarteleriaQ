@@ -19,6 +19,7 @@ model Business {
   media          Media[]
   priceLists     PriceList[]
   products       Product[]
+  priceChanges   PriceChange[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -49,6 +50,7 @@ model Screen {
   layout        String    @default("split") // split, full-media, full-menu
   transition    String    @default("fade") // fade, slide, zoom
   mediaDuration Int       @default(10) // duration in seconds per image
+  menuStyle     String    @default("list") // list | photo-list | cards
   lastSeenAt    DateTime? // último sync del reproductor
   playerVersion String? // versión del reproductor que informa la TV (ej. "2026-10-09 21:01 UTC [ota]")
   createdAt     DateTime  @default(now())
@@ -89,6 +91,7 @@ model Media {
   businessId String
   business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   items      PlaylistItem[]
+  productImages Product[]   @relation("ProductImage")
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 }
@@ -98,19 +101,31 @@ model PriceList {
   name          String
   businessId    String
   business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  groupByCategory Boolean      @default(false) // agrupar los artículos por categoría en la pantalla
+  hideUnavailable Boolean      @default(false) // ocultar los artículos sin stock (si no, se muestran como AGOTADO)
   items         PriceItem[]
   playlistItems PlaylistItem[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
 
+// Artículo dentro de una lista de pantalla.
+// - Enlazado (productId): toma nombre, precio, foto, etc. del catálogo, así que un cambio de precio llega solo a las pantallas.
+// - Manual (productId null): usa sus propios campos, independientes del catálogo.
 model PriceItem {
   id          String    @id @default(uuid())
   priceListId String
   priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product?  @relation(fields: [productId], references: [id], onDelete: Cascade)
   productName String
   description String?
   price       Float
+  unit        String?
+  oldPrice    Float?
+  badge       String?
+  category    String?
+  available   Boolean   @default(true)
   order       Int       @default(0)
 }
 
@@ -123,9 +138,55 @@ model Product {
   name         String
   description  String?
   price        Float
+  category     String? // libre: "Vacuno", "Bebidas", "Tornillería"…
+  unit         String? // unidad de venta: "kg", "unidad", "100 g", "litro"…
+  oldPrice     Float? // precio anterior (se muestra tachado)
+  badge        String? // etiqueta: "OFERTA", "NUEVO"…
+  available    Boolean  @default(true) // false = sin stock
+  imageId      String?
+  image        Media?   @relation("ProductImage", fields: [imageId], references: [id], onDelete: SetNull)
+  priceItems   PriceItem[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@unique([businessId, internalCode])
   @@unique([businessId, barcode])
+}
+
+// Cambio masivo de precios (inmediato o programado). Guarda la regla y, al aplicarse, el detalle para poder deshacerlo.
+model PriceChange {
+  id             String    @id @default(uuid())
+  businessId     String
+  business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  description    String
+  operation      String // percent | amount
+  value          Float
+  roundStep      Float     @default(0)
+  roundDirection String    @default("nearest") // nearest | up | down
+  scope          Json // { type: all|categories|products, categories?, productIds?, includeManual? }
+  status         String    @default("pending") // pending | applying | applied | undone | cancelled | failed
+  scheduledFor   DateTime?
+  appliedAt      DateTime?
+  undoneAt       DateTime?
+  affectedCount  Int       @default(0)
+  errorMessage   String?
+  undoSummary    String?
+  items          PriceChangeItem[]
+  createdAt      DateTime  @default(now())
+
+  @@index([businessId, createdAt])
+  @@index([status, scheduledFor])
+}
+
+model PriceChangeItem {
+  id         String      @id @default(uuid())
+  changeId   String
+  change     PriceChange @relation(fields: [changeId], references: [id], onDelete: Cascade)
+  targetType String // product | priceItem
+  targetId   String
+  name       String
+  oldPrice   Float
+  newPrice   Float
+
+  @@index([changeId])
 }
