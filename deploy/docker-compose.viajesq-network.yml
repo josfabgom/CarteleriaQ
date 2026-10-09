@@ -1,0 +1,15 @@
+# Override para este VPS: conecta el enrutador de CarteleriaQ a la red del Caddy de viajesq
+# (que es dueño de 80/443) para que le haga de proxy HTTPS. Alias propio para no chocar con sus servicios.
+#   docker compose -p carteleriaq -f docker-compose.shared.yml -f deploy/docker-compose.viajesq-network.yml up -d
+services:
+  edge:
+    networks:
+      default: {}
+      viajesq:
+        aliases:
+          - carteleriaq-edge
+
+networks:
+  viajesq:
+    external: true
+    name: viajesq_default
