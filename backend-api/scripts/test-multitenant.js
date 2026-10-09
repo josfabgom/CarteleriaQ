@@ -161,7 +161,8 @@ const upload = (token, buf, name = 'x.png', type = 'image/png') => {
   const assign = await call('POST', `/api/screens/${reg1.id}/assign`, { token: A.token, body: { priceListId: listA.id, mediaIds: [up.data.id], layout: 'split' } });
   check('A asigna su lista y su imagen', assign.status === 200);
   const sync2 = (await call('GET', `/api/screens/${reg1.id}/sync`, { token: pair1.token })).data;
-  check('la TV recibe el contenido asignado', sync2.playlist.items.length === 2);
+  check('la TV recibe el contenido asignado (una escena de precios con la promo al costado)',
+    sync2.scenes.length === 1 && sync2.scenes[0].type === 'prices' && sync2.scenes[0].side.length === 1 && sync2.scenes[0].priceList.items.length === 1);
   check('B no ve las pantallas de A', (await call('GET', '/api/screens', { token: B.token })).data.every((s) => s.id !== reg1.id));
   check('B no puede borrar la pantalla de A -> 404', (await call('DELETE', `/api/screens/${reg1.id}`, { token: B.token })).status === 404);
 

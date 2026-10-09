@@ -57,9 +57,12 @@ model Screen {
   updatedAt     DateTime  @updatedAt
 }
 
+// Ciclo: secuencia de escenas que se asigna a una o varias pantallas.
+// private = ciclo propio de una pantalla (lo crea la configuración rápida), no pensado para compartirse.
 model Playlist {
   id         String         @id @default(uuid())
   name       String
+  private    Boolean        @default(false)
   businessId String
   business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   items      PlaylistItem[]
@@ -78,6 +81,11 @@ model PlaylistItem {
   priceList   PriceList? @relation(fields: [priceListId], references: [id], onDelete: Cascade)
   duration    Int        @default(10) // duration in seconds
   order       Int
+  // Escena: prices | offers | media | text (legacy = formato anterior, se convierte al iniciar el servidor)
+  type        String     @default("legacy")
+  name        String?
+  enabled     Boolean    @default(true)
+  config      Json? // opciones propias del tipo de escena
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }

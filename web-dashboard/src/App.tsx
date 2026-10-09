@@ -8,6 +8,7 @@ import PriceListManager from './components/PriceListManager';
 import PricingManager from './components/PricingManager';
 import ProductManager from './components/ProductManager';
 import ScreenManager from './components/ScreenManager';
+import CycleManager from './components/CycleManager';
 
 const BUSINESS_NAV = [
   { id: 'dashboard', label: 'Inicio' },
@@ -16,6 +17,7 @@ const BUSINESS_NAV = [
   { id: 'articulos', label: 'Catálogo de Artículos' },
   { id: 'ajuste', label: 'Ajuste de precios' },
   { id: 'precios', label: 'Listas de Pantalla' },
+  { id: 'ciclos', label: 'Ciclos' },
   { id: 'cuenta', label: 'Mi cuenta' }
 ];
 
@@ -43,6 +45,7 @@ const App = () => {
   const [me, setMe] = useState<Me | null>(null);
   const [checking, setChecking] = useState(!!getToken());
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [cycleToEdit, setCycleToEdit] = useState<string | null>(null);
 
   const refreshMe = useCallback(async () => {
     const res = await apiFetch('/api/auth/me');
@@ -152,7 +155,7 @@ const App = () => {
                 <p className="text-gray-600 mt-2">Selecciona un módulo en el menú lateral para comenzar a administrar el contenido de tus pantallas.</p>
               </header>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-6">
                 <div onClick={() => setActiveTab('pantallas')} className="bg-white p-6 shadow-sm rounded-lg border border-gray-100 cursor-pointer hover:shadow-md transition">
                   <h3 className="text-lg font-semibold mb-2 text-blue-600">Pantallas</h3>
                   <p className="text-gray-500 text-sm">Gestiona los dispositivos conectados y su programación.</p>
@@ -164,6 +167,10 @@ const App = () => {
                 <div onClick={() => setActiveTab('articulos')} className="bg-white p-6 shadow-sm rounded-lg border border-gray-100 cursor-pointer hover:shadow-md transition">
                   <h3 className="text-lg font-semibold mb-2 text-blue-600">Artículos</h3>
                   <p className="text-gray-500 text-sm">Tus artículos con foto, unidad, categoría y precio.</p>
+                </div>
+                <div onClick={() => setActiveTab('ciclos')} className="bg-white p-6 shadow-sm rounded-lg border border-gray-100 cursor-pointer hover:shadow-md transition">
+                  <h3 className="text-lg font-semibold mb-2 text-blue-600">Ciclos</h3>
+                  <p className="text-gray-500 text-sm">Combiná precios, ofertas y promos para que roten en tus pantallas.</p>
                 </div>
                 <div onClick={() => setActiveTab('ajuste')} className="bg-white p-6 shadow-sm rounded-lg border border-gray-100 cursor-pointer hover:shadow-md transition">
                   <h3 className="text-lg font-semibold mb-2 text-blue-600">Ajuste de precios</h3>
@@ -179,7 +186,7 @@ const App = () => {
 
           {activeTab === 'pantallas' && !isAdmin && (
             <div>
-              <ScreenManager />
+              <ScreenManager onEditCycle={(id) => { setCycleToEdit(id); setActiveTab('ciclos'); }} />
             </div>
           )}
 
@@ -194,6 +201,12 @@ const App = () => {
             <div>
               <h2 className="text-2xl font-bold text-gray-800 mb-6">Inventario Global</h2>
               <ProductManager />
+            </div>
+          )}
+
+          {activeTab === 'ciclos' && !isAdmin && (
+            <div>
+              <CycleManager openCycleId={cycleToEdit} onOpened={() => setCycleToEdit(null)} />
             </div>
           )}
 

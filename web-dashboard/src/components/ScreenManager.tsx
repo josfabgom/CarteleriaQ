@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { API_URL } from '../config';
 import { apiFetch } from '../api';
 
-const ScreenManager = () => {
+const ScreenManager = ({ onEditCycle }: { onEditCycle?: (id: string) => void }) => {
   const [screens, setScreens] = useState<any[]>([]);
+  const [cycles, setCycles] = useState<any[]>([]);
   const [pairingCode, setPairingCode] = useState('');
   const [newScreenName, setNewScreenName] = useState('');
   const [newScreenLocation, setNewScreenLocation] = useState('');
@@ -24,11 +25,23 @@ const ScreenManager = () => {
 
   const fetchScreens = async () => {
     try {
-      const res = await apiFetch(`/api/screens`);
+      const [res, resCycles] = await Promise.all([apiFetch('/api/screens'), apiFetch('/api/cycles')]);
       if (res.ok) setScreens(await res.json());
+      if (resCycles.ok) setCycles(await resCycles.json());
     } catch (e) {
       console.error(e);
     }
+  };
+
+  // Asignar un ciclo (o quitarlo) y/o cambiar la transición entre escenas
+  const setScreenCycle = async (screenId: string, playlistId: string | null, transition?: string) => {
+    const res = await apiFetch(`/api/screens/${screenId}/cycle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playlistId, transition })
+    });
+    if (res.ok) fetchScreens();
+    else setStatusMsg((await res.json().catch(() => null))?.error || 'No se pudo asignar el ciclo.');
   };
 
   useEffect(() => {
@@ -195,36 +208,43 @@ const ScreenManager = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase">Contenido Asignado</label>
-                {screen.playlist ? (
-                  <div className="mt-1 p-2 bg-green-50 text-green-800 border border-green-200 rounded text-sm">
-                    {(() => {
-                      const plItems = screen.playlist.items || [];
-                      const plPriceList = plItems.find((i: any) => i.priceList)?.priceList;
-                      const plMedias = plItems.filter((i: any) => i.media).map((i: any) => i.media);
-
-                      return (
-                        <div className="flex flex-col gap-1 text-xs">
-                          <div>
-                            <span className="font-semibold">Menú:</span> {plPriceList ? plPriceList.name : 'Ninguno'}
-                          </div>
-                          <div>
-                            <span className="font-semibold">Promociones:</span> {plMedias.length > 0 ? plMedias.map((m: any) => m.name).join(', ') : 'Ninguna'}
-                          </div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase">Ciclo de contenido</label>
+                {(() => {
+                  const current = cycles.find((c: any) => c.id === screen.playlistId);
+                  return (
+                    <div className="mt-1 space-y-2">
+                      <select
+                        value={screen.playlistId || ''}
+                        onChange={(e) => setScreenCycle(screen.id, e.target.value || null)}
+                        className={`w-full border p-2 rounded text-sm bg-white ${screen.playlistId ? '' : 'border-orange-300 bg-orange-50'}`}
+                      >
+                        <option value="">⚠️ Sin ciclo: elegí uno</option>
+                        {cycles.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.name}{c.private ? ' (propio)' : ''}</option>
+                        ))}
+                      </select>
+                      {current && (
+                        <div className="flex items-center justify-between text-xs text-gray-600">
+                          <span>{current.scenes} escena(s) · {current.totalSeconds >= 60 ? `${Math.round(current.totalSeconds / 60)} min` : `${current.totalSeconds} s`}{current.screens.length > 1 ? ` · compartido con ${current.screens.length - 1} más` : ''}</span>
+                          {onEditCycle && <button onClick={() => onEditCycle(current.id)} className="text-blue-600 hover:underline font-medium">Editar ciclo</button>}
                         </div>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  <div className="p-2 rounded text-sm mt-1 border truncate bg-orange-50 text-orange-800 border-orange-200">
-                    ⚠️ Sin contenido, asigna ahora
-                  </div>
-                )}
+                      )}
+                      <label className="flex items-center justify-between text-xs text-gray-600">
+                        <span>Transición entre escenas</span>
+                        <select value={screen.transition || 'fade'} onChange={(e) => setScreenCycle(screen.id, screen.playlistId || null, e.target.value)} className="border p-1 rounded bg-white">
+                          <option value="fade">Fundido</option>
+                          <option value="slide">Deslizar</option>
+                          <option value="zoom">Acercamiento</option>
+                        </select>
+                      </label>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
             <div className="flex space-x-2 border-t border-gray-100 pt-4">
-              <button onClick={() => openAssignModal(screen.id)} className="flex-1 bg-blue-50 text-blue-700 py-1.5 rounded text-sm font-medium hover:bg-blue-100 border border-blue-200">Asignar Contenido</button>
+              <button onClick={() => openAssignModal(screen.id)} className="flex-1 bg-blue-50 text-blue-700 py-1.5 rounded text-sm font-medium hover:bg-blue-100 border border-blue-200">Configuración rápida</button>
               <button onClick={() => handleDelete(screen.id)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded text-sm font-medium hover:bg-red-100">Eliminar</button>
             </div>
           </div>
@@ -241,8 +261,8 @@ const ScreenManager = () => {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
             <div className="p-6 border-b">
-              <h2 className="text-2xl font-bold text-gray-800">Asignar Contenido a la Pantalla</h2>
-              <p className="text-gray-500 text-sm mt-1">Configura el diseño, animaciones y contenido que se mostrará.</p>
+              <h2 className="text-2xl font-bold text-gray-800">Configuración rápida de la pantalla</h2>
+              <p className="text-gray-500 text-sm mt-1">Una lista de precios con promos al costado, sin armar un ciclo. Crea un ciclo propio de esta pantalla (para varias escenas usá "Ciclos").</p>
             </div>
             
             <div className="p-6 overflow-y-auto flex-1">

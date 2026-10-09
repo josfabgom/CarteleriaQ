@@ -445,7 +445,7 @@ function makeBadge(text) {
   const b = document.createElement('span');
   b.className = 'badge';
   b.textContent = text;
-  b.style.background = BADGE_COLORS[text.toUpperCase()] || '#ea580c';
+  b.style.background = /^-\d+%$/.test(text) ? '#dc2626' : (BADGE_COLORS[text.toUpperCase()] || '#ea580c');
   return b;
 }
 
@@ -640,98 +640,301 @@ function fitPriceList() {
 window.addEventListener('resize', () => fitPriceList());
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitPriceList());
 
+// ---- Escenas: el ciclo de la pantalla ----
+// Un ciclo es una secuencia de escenas (precios, ofertas, imagen/video, texto) que rotan según su duración.
+let sceneTimer = null;
+let heroTimer = null;
+let currentSceneId = null;
+let sceneToken = 0;
+
+function stopSceneContent() {
+  if (heroTimer) { clearInterval(heroTimer); heroTimer = null; }
+  if (carouselInterval) { clearInterval(carouselInterval); carouselInterval = null; }
+}
+
+function stopScenes() {
+  if (sceneTimer) { clearTimeout(sceneTimer); sceneTimer = null; }
+  sceneToken++; // anula cualquier cambio de escena pendiente
+  stopSceneContent();
+}
+
+// Configuración del formato anterior (servidor viejo o copia guardada): una lista de precios + promos según el diseño
+function legacyScenes(screenData) {
+  const items = screenData.playlist?.items || [];
+  const list = items.find((i) => i.priceList);
+  const media = items.filter((i) => i.media).map((i) => i.media);
+  const layout = screenData.layout || 'split';
+  if (list && layout !== 'full-media') {
+    return [{ id: 'legacy', type: 'prices', duration: 600, style: screenData.menuStyle || 'list', priceList: list.priceList, side: layout === 'split' ? media : [] }];
+  }
+  return media.map((m, i) => ({ id: 'legacy-' + i, type: 'media', duration: screenData.mediaDuration || 10, media: m }));
+}
+
 function startPlayer(screenData) {
+  const previousScene = currentSceneId;
   currentSyncData = screenData;
-  const playlistItems = screenData.playlist?.items || [];
-  
-  // Set layout and transition from screen
-  document.body.className = `layout-${screenData.layout || 'split'} transition-${screenData.transition || 'fade'}`;
-  
-  const durationMs = (screenData.mediaDuration || 10) * 1000;
+  stopScenes();
 
-  // Encontrar la lista de precios y los medios
-  const priceListItem = playlistItems.find(item => item.priceList);
-  const mediaItems = playlistItems.filter(item => item.media);
+  const scenes = (screenData.scenes || legacyScenes(screenData)).filter(Boolean);
+  if (scenes.length === 0) {
+    currentSceneId = null;
+    renderIdle(screenData);
+    return;
+  }
+  // Si el contenido cambió pero la escena actual sigue existiendo, se continúa desde ahí en vez de volver al principio
+  const found = scenes.findIndex((sc) => sc.id === previousScene);
+  playScene(scenes, found >= 0 ? found : 0, screenData, true);
+}
 
-  // Renderizar precios
+function playScene(scenes, index, screenData, immediate) {
+  const scene = scenes[index];
+  const token = ++sceneToken;
+  const show = () => {
+    if (token !== sceneToken) return;
+    currentSceneId = scene.id;
+    renderScene(scene, screenData);
+    document.body.classList.remove('scene-out');
+  };
+  if (immediate) show();
+  else { document.body.classList.add('scene-out'); setTimeout(show, 380); }
+
+  // Con una sola escena no hay rotación
+  if (scenes.length > 1) {
+    if (sceneTimer) clearTimeout(sceneTimer);
+    sceneTimer = setTimeout(() => playScene(scenes, (index + 1) % scenes.length, screenData, false), Math.max(3, scene.duration) * 1000);
+  }
+}
+
+function renderIdle(screenData) {
+  stopSceneContent();
+  document.body.className = 'layout-full-media transition-' + (screenData.transition || 'fade');
   priceListContainer.innerHTML = '';
-  if (priceListItem && priceListItem.priceList) {
-    const headerTitle = document.querySelector('.header-precios');
-    if (headerTitle) headerTitle.innerText = priceListItem.priceList.name || 'Menú de Hoy';
-
-    const style = ['list', 'photo-list', 'cards'].includes(screenData.menuStyle) ? screenData.menuStyle : 'list';
-    if (style === 'cards') renderCards(priceListItem.priceList);
-    else renderMenu(priceListItem.priceList, style);
-  }
-  fitPriceList();
-
-  // Detener el carrusel anterior si existía
-  if (carouselInterval) {
-    clearInterval(carouselInterval);
-    carouselInterval = null;
-  }
-
-  // Renderizar Medios (Carrusel)
-  revokeBlobUrls();
   mediaContainer.innerHTML = '';
-  if (mediaItems.length > 0) {
-    mediaItems.forEach((mItem, index) => {
-      const media = mItem.media;
-      let el;
-      if (media.type === 'video' || media.url.match(/\.(mp4|webm|ogg)$/i)) {
-        el = document.createElement('video');
-        el.loop = true;
-        el.muted = true;
-      } else {
-        // Imagen completa (contain) sobre una copia difuminada que rellena el resto del panel
-        el = document.createElement('div');
-        for (const cls of ['bg', 'fg']) {
-          const img = document.createElement('img');
-          img.className = cls;
-          img.alt = '';
-          el.appendChild(img);
-        }
-      }
-      el.className = 'media-element';
-      if (index === 0) el.classList.add('active');
-      mediaContainer.appendChild(el);
-      attachMedia(el, media.url);
-    });
+  const idle = document.createElement('div');
+  idle.className = 'media-element active idle';
+  idle.textContent = 'Esperando contenido…';
+  mediaContainer.appendChild(idle);
+}
 
-    if (mediaItems.length > 1) {
-      let currentIndex = 0;
-      const elements = document.querySelectorAll('.media-element');
-      
-      // Override transition duration if it's Zoom to match the mediaDuration for continuous zoom
-      if (screenData.transition === 'zoom') {
-        const style = document.createElement('style');
-        style.id = 'dynamic-zoom-style';
-        const existing = document.getElementById('dynamic-zoom-style');
-        if(existing) existing.remove();
-        style.innerHTML = `body.transition-zoom #media-container .media-element { transition: opacity 1s ease-in-out, transform ${durationMs/1000}s linear !important; }`;
-        document.head.appendChild(style);
-      }
-      
-      carouselInterval = setInterval(() => {
-        elements[currentIndex].classList.remove('active');
-        // Si era un video, pausarlo
-        if (elements[currentIndex].tagName === 'VIDEO') elements[currentIndex].pause();
-        
-        currentIndex = (currentIndex + 1) % elements.length;
-        
-        elements[currentIndex].classList.add('active');
-        // Si es un video, reproducirlo
-        if (elements[currentIndex].tagName === 'VIDEO') elements[currentIndex].play().catch(e=>console.log(e));
-      }, durationMs);
-    } else {
-       // Si solo hay un video, que se reproduzca
-       const firstEl = document.querySelector('.media-element.active');
-       if (firstEl && firstEl.tagName === 'VIDEO') firstEl.play().catch(e=>console.log(e));
-    }
+function renderScene(scene, screenData) {
+  stopSceneContent();
+  revokeBlobUrls();
+
+  const transition = screenData.transition || 'fade';
+  const header = document.querySelector('.header-precios');
+  header.className = 'header-precios';
+  header.style.display = '';
+  priceListContainer.className = 'price-list';
+  priceListContainer.innerHTML = '';
+  priceListContainer.style.removeProperty('--cols');
+  priceListContainer.style.removeProperty('--photo-h');
+
+  if (scene.type === 'prices') {
+    const side = scene.side || [];
+    document.body.className = (side.length ? 'layout-split' : 'layout-full-menu') + ' transition-' + transition;
+    header.innerText = scene.name || scene.priceList?.name || 'Menú de Hoy';
+    const style = ['list', 'photo-list', 'cards'].includes(scene.style) ? scene.style : 'list';
+    if (style === 'cards') renderCards(scene.priceList);
+    else renderMenu(scene.priceList, style);
+    fitPriceList();
+    renderCarousel(side, (screenData.mediaDuration || 10) * 1000, transition);
+  } else if (scene.type === 'offers') {
+    renderOffers(scene, transition);
+  } else if (scene.type === 'media') {
+    document.body.className = 'layout-full-media transition-' + transition;
+    renderCarousel([scene.media], scene.duration * 1000, transition);
+  } else if (scene.type === 'text') {
+    renderTextScene(scene, transition);
   } else {
-    // Si no hay medios, mostrar algo por defecto para no dejar vacío
-    mediaContainer.innerHTML = '<div class="media-element active" style="background:linear-gradient(135deg,#1e3a8a,#0f172a)"></div>';
+    renderIdle(screenData);
   }
+}
+
+// Carrusel de imágenes/videos en el panel de medios (con cambio automático si hay más de uno)
+function renderCarousel(mediaList, durationMs, transition) {
+  mediaContainer.innerHTML = '';
+  if (mediaList.length === 0) {
+    mediaContainer.innerHTML = '<div class="media-element active" style="background:linear-gradient(135deg,#1e3a8a,#0f172a)"></div>';
+    return;
+  }
+
+  mediaList.forEach((media, index) => {
+    let el;
+    if (media.type === 'video' || (media.url || '').match(/\.(mp4|webm|ogg)$/i)) {
+      el = document.createElement('video');
+      el.loop = true;
+      el.muted = true;
+    } else {
+      // Imagen completa (contain) sobre una copia difuminada que rellena el resto del panel
+      el = document.createElement('div');
+      for (const cls of ['bg', 'fg']) {
+        const img = document.createElement('img');
+        img.className = cls;
+        img.alt = '';
+        el.appendChild(img);
+      }
+    }
+    el.className = 'media-element';
+    if (index === 0) el.classList.add('active');
+    mediaContainer.appendChild(el);
+    attachMedia(el, media.url);
+  });
+
+  if (mediaList.length > 1) {
+    let currentIndex = 0;
+    const elements = mediaContainer.querySelectorAll('.media-element');
+
+    // En "zoom" la animación dura lo mismo que cada imagen para que el acercamiento sea continuo
+    if (transition === 'zoom') {
+      const existing = document.getElementById('dynamic-zoom-style');
+      if (existing) existing.remove();
+      const style = document.createElement('style');
+      style.id = 'dynamic-zoom-style';
+      style.innerHTML = 'body.transition-zoom #media-container .media-element { transition: opacity 1s ease-in-out, transform ' + (durationMs / 1000) + 's linear !important; }';
+      document.head.appendChild(style);
+    }
+
+    carouselInterval = setInterval(() => {
+      elements[currentIndex].classList.remove('active');
+      if (elements[currentIndex].tagName === 'VIDEO') elements[currentIndex].pause();
+      currentIndex = (currentIndex + 1) % elements.length;
+      elements[currentIndex].classList.add('active');
+      if (elements[currentIndex].tagName === 'VIDEO') elements[currentIndex].play().catch((e) => console.log(e));
+    }, durationMs);
+  } else {
+    // Un solo video: que se reproduzca
+    const firstEl = mediaContainer.querySelector('.media-element.active');
+    if (firstEl && firstEl.tagName === 'VIDEO') firstEl.play().catch((e) => console.log(e));
+  }
+}
+
+// ---- Ofertas: "grid" (tarjetas con descuento) o "hero" (un artículo a la vez, a pantalla grande) ----
+function renderOffers(scene, transition) {
+  const items = scene.items || [];
+  const header = document.querySelector('.header-precios');
+  mediaContainer.innerHTML = '';
+
+  if (scene.design === 'grid') {
+    document.body.className = 'layout-full-menu scene-offers-grid transition-' + transition;
+    header.className = 'header-precios offers';
+    header.innerText = scene.name || 'OFERTAS';
+    // Mismas tarjetas que el menú, con el descuento calculado como etiqueta
+    renderCards({
+      groupByCategory: false,
+      items: items.map((i) => ({ ...i, badge: i.discountPercent ? '-' + i.discountPercent + '%' : i.badge }))
+    });
+    priceListContainer.classList.add('offers-grid');
+    fitPriceList();
+    return;
+  }
+
+  document.body.className = 'layout-full-menu scene-offers-hero transition-' + transition;
+  header.style.display = 'none';
+  priceListContainer.className = 'price-list offers-hero-host';
+
+  const stage = document.createElement('div');
+  stage.className = 'hero';
+  const tag = document.createElement('div');
+  tag.className = 'hero-tag';
+  tag.textContent = scene.name || 'OFERTAS';
+  const dots = document.createElement('div');
+  dots.className = 'hero-dots';
+  items.forEach(() => dots.appendChild(document.createElement('span')));
+  priceListContainer.append(stage, tag, dots);
+
+  let index = 0;
+  const draw = () => {
+    stage.innerHTML = '';
+    const pending = [];
+    stage.appendChild(buildHeroSlide(items[index], pending));
+    for (const [img, url] of pending) attachMedia(img, url);
+    [...dots.children].forEach((d, i) => d.classList.toggle('on', i === index));
+  };
+  draw();
+
+  if (items.length > 1) {
+    // Cada oferta se muestra entre 4 y 12 segundos, repartiendo la duración de la escena
+    const each = Math.max(4000, Math.min(12000, (scene.duration * 1000) / items.length));
+    heroTimer = setInterval(() => { index = (index + 1) % items.length; draw(); }, each);
+  } else {
+    dots.style.display = 'none';
+  }
+}
+
+function buildHeroSlide(item, pending) {
+  const slide = document.createElement('div');
+  slide.className = 'hero-slide' + (item.available === false ? ' unavailable' : '');
+
+  const photo = document.createElement('div');
+  photo.className = 'hero-photo';
+  photo.appendChild(makePhoto(item, 'hero-img', pending));
+  if (item.discountPercent) {
+    const disc = document.createElement('div');
+    disc.className = 'hero-discount';
+    disc.textContent = '-' + item.discountPercent + '%';
+    photo.appendChild(disc);
+  } else if (item.badge) {
+    photo.appendChild(makeBadge(item.badge));
+  }
+
+  const info = document.createElement('div');
+  info.className = 'hero-info';
+  const name = document.createElement('div');
+  name.className = 'hero-name';
+  name.textContent = itemName(item);
+  info.appendChild(name);
+  if (item.description) {
+    const d = document.createElement('div');
+    d.className = 'hero-desc';
+    d.textContent = item.description;
+    info.appendChild(d);
+  }
+  const old = Number(item.oldPrice);
+  if (Number.isFinite(old) && old > Number(item.price)) {
+    const o = document.createElement('div');
+    o.className = 'hero-old';
+    o.textContent = 'Antes ' + formatPrice(old);
+    info.appendChild(o);
+  }
+  const price = document.createElement('div');
+  price.className = 'hero-price';
+  price.textContent = formatPrice(item.price);
+  const unit = (item.unit || '').trim();
+  if (unit && !['unidad', 'u', 'un'].includes(unit.toLowerCase())) {
+    const u = document.createElement('span');
+    u.className = 'hero-unit';
+    u.textContent = ' / ' + unit;
+    price.appendChild(u);
+  }
+  info.appendChild(price);
+
+  slide.append(photo, info);
+  return slide;
+}
+
+// ---- Anuncio de texto ----
+function renderTextScene(scene, transition) {
+  document.body.className = 'layout-full-menu scene-text transition-' + transition;
+  document.querySelector('.header-precios').style.display = 'none';
+  mediaContainer.innerHTML = '';
+  priceListContainer.className = 'price-list text-host';
+
+  const box = document.createElement('div');
+  box.className = 'text-scene theme-' + (scene.theme || 'red');
+  const title = document.createElement('div');
+  title.className = 'text-title';
+  title.textContent = scene.title || '';
+  // Los títulos largos se achican para que entren
+  const len = (scene.title || '').length;
+  title.style.fontSize = 'calc(' + (len > 60 ? 64 : len > 35 ? 84 : 112) + ' * var(--u))';
+  box.appendChild(title);
+  if (scene.subtitle) {
+    const sub = document.createElement('div');
+    sub.className = 'text-subtitle';
+    sub.textContent = scene.subtitle;
+    box.appendChild(sub);
+  }
+  priceListContainer.appendChild(box);
 }
 
 // boot.js no debe reiniciar el reproductor mientras alguien configura el servidor con el control remoto

@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import prisma from '../prisma';
 import { bid, randomToken, requireBusiness, requireScreenToken, sha256 } from '../auth';
 import { PRODUCT_WITH_IMAGE, resolveItems } from '../menu';
+import { MENU_STYLES, SceneData, buildScenes, replaceScenes } from '../scenes';
 
 const router = Router();
 
@@ -142,7 +143,9 @@ router.get('/:id/sync', requireScreenToken, async (req, res) => {
         entry.priceList ? { ...entry, priceList: { ...entry.priceList, items: resolveItems(entry.priceList) } } : entry
       )
     };
-    res.json({ ...config, playlist });
+    // Las escenas del ciclo ya resueltas (las ofertas y las listas se calculan en vivo)
+    const scenes = await buildScenes(screen.playlistId, screen.businessId!);
+    res.json({ ...config, playlist, scenes });
   } catch (error) {
     res.status(500).json({ error: 'Error syncing screen' });
   }
@@ -191,15 +194,16 @@ router.post('/link', requireBusiness, async (req, res) => {
   }
 });
 
-// Asignar lista de precios y medios a la pantalla
+// Configuración rápida: lista de precios + promos. Crea (o actualiza) un ciclo propio de la pantalla.
 router.post('/:id/assign', requireBusiness, async (req, res) => {
   try {
     const id = String(req.params.id);
     const businessId = bid(req);
     const { priceListId, mediaIds, layout, transition, mediaDuration } = req.body;
-    const menuStyle = ['list', 'photo-list', 'cards'].includes(req.body.menuStyle) ? req.body.menuStyle : 'list';
+    const menuStyle = MENU_STYLES.includes(req.body.menuStyle) ? req.body.menuStyle : 'list';
+    const layoutValue = ['split', 'full-media', 'full-menu'].includes(layout) ? layout : 'split';
 
-    const screen = await prisma.screen.findFirst({ where: { id, businessId } });
+    const screen = await prisma.screen.findFirst({ where: { id, businessId }, include: { playlist: true } });
     if (!screen) return res.status(404).json({ error: 'Screen not found' });
 
     // La lista y los medios deben ser del mismo negocio
@@ -211,33 +215,36 @@ router.post('/:id/assign', requireBusiness, async (req, res) => {
       return res.status(400).json({ error: 'Medios inválidos' });
     }
 
-    const duration = Number(mediaDuration) > 0 ? Number(mediaDuration) : 10;
-    const items = [
-      ...(priceListId ? [{ priceListId: String(priceListId), order: 0, duration: PRICE_LIST_DURATION }] : []),
-      ...ids.map((mId, index) => ({ mediaId: mId, order: index + 1, duration }))
-    ];
-
-    // Reutilizar la playlist de la pantalla en vez de acumular playlists huérfanas
-    const playlistId = await prisma.$transaction(async (tx) => {
-      if (screen.playlistId) {
-        await tx.playlistItem.deleteMany({ where: { playlistId: screen.playlistId } });
-        await tx.playlistItem.createMany({
-          data: items.map((i) => ({ ...i, playlistId: screen.playlistId! }))
-        });
-        return screen.playlistId;
-      }
-      const playlist = await tx.playlist.create({
-        data: { name: `Playlist - Screen ${id}`, businessId, items: { create: items } }
+    const duration = Number(mediaDuration) > 0 ? Math.max(3, Math.min(600, Number(mediaDuration))) : 10;
+    const base = { name: null, enabled: true, priceListId: null as string | null, mediaId: null as string | null };
+    const scenes: SceneData[] = [];
+    if (priceListId && layoutValue !== 'full-media') {
+      // Lista de precios; con "split" las promos van al costado
+      scenes.push({
+        ...base, type: 'prices', duration: 600, priceListId: String(priceListId),
+        config: { style: menuStyle, categories: [], sideMediaIds: layoutValue === 'split' ? ids : [] }
       });
-      return playlist.id;
+    } else {
+      for (const mId of ids) scenes.push({ ...base, type: 'media', duration, mediaId: mId, config: {} });
+    }
+
+    // Se usa el ciclo propio de la pantalla; un ciclo compartido nunca se pisa desde acá
+    const playlistId = await prisma.$transaction(async (tx) => {
+      if (screen.playlist?.private) {
+        await replaceScenes(tx, screen.playlist.id, scenes);
+        return screen.playlist.id;
+      }
+      const created = await tx.playlist.create({ data: { name: `Ciclo de ${screen.name}`.slice(0, 80), private: true, businessId } });
+      await replaceScenes(tx, created.id, scenes);
+      return created.id;
     });
 
     const updated = await prisma.screen.update({
       where: { id },
       data: {
         playlistId,
-        layout: layout || 'split',
-        transition: transition || 'fade',
+        layout: layoutValue,
+        transition: ['fade', 'slide', 'zoom'].includes(transition) ? transition : 'fade',
         menuStyle,
         mediaDuration: duration
       }
@@ -247,6 +254,26 @@ router.post('/:id/assign', requireBusiness, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error assigning content' });
+  }
+});
+
+// Asignar un ciclo (compartido o propio) a la pantalla, o quitárselo con playlistId null
+router.post('/:id/cycle', requireBusiness, async (req, res) => {
+  try {
+    const businessId = bid(req);
+    const screen = await prisma.screen.findFirst({ where: { id: String(req.params.id), businessId } });
+    if (!screen) return res.status(404).json({ error: 'Screen not found' });
+
+    const playlistId = req.body?.playlistId ? String(req.body.playlistId) : null;
+    if (playlistId && !(await prisma.playlist.findFirst({ where: { id: playlistId, businessId } }))) {
+      return res.status(400).json({ error: 'Ciclo inválido' });
+    }
+    const data: Record<string, unknown> = { playlistId };
+    if (['fade', 'slide', 'zoom'].includes(req.body?.transition)) data.transition = req.body.transition;
+
+    res.json(publicScreen(await prisma.screen.update({ where: { id: screen.id }, data })));
+  } catch (error) {
+    res.status(500).json({ error: 'Error assigning cycle' });
   }
 });
 
@@ -277,9 +304,10 @@ router.get('/', requireBusiness, async (req, res) => {
 router.put('/:id', requireBusiness, async (req, res) => {
   try {
     const { name, location } = req.body;
+    const transition = ['fade', 'slide', 'zoom'].includes(req.body?.transition) ? req.body.transition : undefined;
     const result = await prisma.screen.updateMany({
       where: { id: String(req.params.id), businessId: bid(req) },
-      data: { name, location }
+      data: { name, location, ...(transition ? { transition } : {}) }
     });
     if (result.count === 0) return res.status(404).json({ error: 'Screen not found' });
     res.json(publicScreen(await prisma.screen.findUniqueOrThrow({ where: { id: String(req.params.id) } })));
