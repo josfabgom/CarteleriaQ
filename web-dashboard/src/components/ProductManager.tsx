@@ -85,9 +85,13 @@ const ProductManager = () => {
 
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [uploadOk, setUploadOk] = useState(true);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   const handleUploadCSV = async () => {
     if (!uploadFile) return;
+    setUploadOk(true);
+    setUploadErrors([]);
     setUploadStatus('Subiendo e importando artículos...');
     const formData = new FormData();
     formData.append('file', uploadFile);
@@ -97,15 +101,24 @@ const ProductManager = () => {
         method: 'POST',
         body: formData,
       });
+      const data = await res.json().catch(() => null);
 
       if (res.ok) {
-        setUploadStatus('¡Importación completada con éxito!');
+        const errors: string[] = data?.errors || [];
+        setUploadOk(errors.length === 0);
+        setUploadStatus(
+          `Importación terminada: ${data?.created ?? 0} nuevos, ${data?.updated ?? 0} actualizados` +
+          (errors.length ? `, ${errors.length} fila(s) rechazada(s).` : '.')
+        );
+        setUploadErrors(errors);
         setUploadFile(null);
         fetchProducts();
       } else {
-        setUploadStatus('Error al importar el archivo CSV.');
+        setUploadOk(false);
+        setUploadStatus(data?.error || 'Error al importar el archivo CSV.');
       }
     } catch (error) {
+      setUploadOk(false);
       setUploadStatus('Error de conexión.');
     }
   };
@@ -118,7 +131,7 @@ const ProductManager = () => {
       <div className="mb-8 p-6 border rounded-lg bg-gray-50 border-gray-200 shadow-sm">
         <h4 className="font-semibold mb-2 text-blue-700">Importar Artículos desde CSV</h4>
         <p className="text-sm text-gray-500 mb-3">
-          El CSV debe tener las columnas: <code>codigo_interno</code>, <code>codigo_barra</code>, <code>nombre</code>, <code>descripcion</code>, <code>precio</code>
+          Primera fila con los encabezados <code>nombre</code> y <code>precio</code> (obligatorios), y opcionalmente <code>codigo_interno</code>, <code>codigo_barra</code> y <code>descripcion</code>. Acepta separador coma o punto y coma (Excel). Si el código ya existe, el artículo se actualiza.
         </p>
         <div className="flex flex-col md:flex-row gap-4 mb-2 items-center">
           <input 
@@ -134,7 +147,15 @@ const ProductManager = () => {
             Subir e Importar
           </button>
         </div>
-        {uploadStatus && <p className="text-sm font-medium text-blue-600">{uploadStatus}</p>}
+        {uploadStatus && (
+          <p className={`text-sm font-medium ${uploadOk ? 'text-blue-600' : 'text-red-600'}`}>{uploadStatus}</p>
+        )}
+        {uploadErrors.length > 0 && (
+          <ul className="mt-2 text-sm text-red-600 list-disc pl-5 max-h-40 overflow-y-auto">
+            {uploadErrors.slice(0, 50).map((e, i) => <li key={i}>{e}</li>)}
+            {uploadErrors.length > 50 && <li>…y {uploadErrors.length - 50} más</li>}
+          </ul>
+        )}
       </div>
 
       {/* Formulario ABM */}

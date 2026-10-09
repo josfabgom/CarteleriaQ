@@ -48,7 +48,7 @@ const CONFIG_CACHE_KEY = 'lastConfig';
 // Indicador discreto de "sin conexión" (el contenido sigue reproduciéndose)
 const offlineBadge = document.createElement('div');
 offlineBadge.textContent = 'Sin conexión · OK para cambiar servidor';
-offlineBadge.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:9000;padding:4px 10px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font:12px sans-serif;display:none;pointer-events:none';
+offlineBadge.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:9000;padding:4px 10px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font:0.8rem sans-serif;display:none;pointer-events:none';
 document.body.appendChild(offlineBadge);
 const setOffline = (offline) => { offlineBadge.style.display = offline ? 'block' : 'none'; };
 
@@ -392,10 +392,13 @@ async function attachMedia(el, url) {
     if (cachedSrc) URL.revokeObjectURL(cachedSrc);
     return;
   }
-  el.src = cachedSrc || getMediaUrl(url);
-  if (cachedSrc) {
-    // Si la copia local falla, intentar por red
-    el.addEventListener('error', () => { el.src = getMediaUrl(url); }, { once: true });
+  const targets = el.tagName === 'DIV' ? [...el.querySelectorAll('img')] : [el];
+  for (const t of targets) {
+    t.src = cachedSrc || getMediaUrl(url);
+    if (cachedSrc) {
+      // Si la copia local falla, intentar por red
+      t.addEventListener('error', () => { t.src = getMediaUrl(url); }, { once: true });
+    }
   }
   if (el.tagName === 'VIDEO' && el.classList.contains('active')) el.play().catch(() => {});
 }
@@ -406,6 +409,48 @@ function getMediaUrl(url) {
   let cleanUrl = url.startsWith('/') ? url : '/' + url;
   return `${API_BASE()}${cleanUrl}`;
 }
+
+// 9500 -> "$9.500"; 9500.5 -> "$9.500,50"
+function formatPrice(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '$' + value;
+  const fixed = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  const [int, dec] = fixed.split('.');
+  return '$' + int.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (dec ? ',' + dec : '');
+}
+
+// Hace entrar la lista de precios en el alto de la pantalla: primero reduce el tamaño de letra
+// (hasta 70%) y, si aun así no cabe (listas muy largas), la desplaza sola de arriba hacia abajo.
+let listScrollTimer = null;
+function fitPriceList() {
+  if (listScrollTimer) { clearInterval(listScrollTimer); listScrollTimer = null; }
+  priceListContainer.scrollTop = 0;
+
+  let scale = 1;
+  const root = document.documentElement;
+  root.style.setProperty('--list-scale', scale);
+  while (priceListContainer.scrollHeight > priceListContainer.clientHeight + 1 && scale > 0.7) {
+    scale = Math.round((scale - 0.05) * 100) / 100;
+    root.style.setProperty('--list-scale', scale);
+  }
+
+  if (priceListContainer.scrollHeight > priceListContainer.clientHeight + 1) {
+    // Desplazamiento automático con pausa al principio y al final
+    let pause = 0;
+    let direction = 1;
+    listScrollTimer = setInterval(() => {
+      if (pause > 0) { pause--; return; }
+      priceListContainer.scrollTop += direction;
+      const atEnd = priceListContainer.scrollTop + priceListContainer.clientHeight >= priceListContainer.scrollHeight - 1;
+      if (direction === 1 && atEnd) { pause = 100; direction = -1; }
+      else if (direction === -1 && priceListContainer.scrollTop <= 0) { pause = 100; direction = 1; }
+    }, 30);
+  }
+}
+
+// Reajustar si cambia el tamaño de la ventana o terminan de cargar las fuentes
+window.addEventListener('resize', () => fitPriceList());
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitPriceList());
 
 function startPlayer(screenData) {
   currentSyncData = screenData;
@@ -430,13 +475,17 @@ function startPlayer(screenData) {
     items.forEach(item => {
       const itemDiv = document.createElement('div');
       itemDiv.className = 'price-item';
-      itemDiv.innerHTML = `
-        <div class="price-name">${item.productName || item.name}</div>
-        <div class="price-value">$${item.price}</div>
-      `;
+      const name = document.createElement('div');
+      name.className = 'price-name';
+      name.textContent = item.productName || item.name || '';
+      const value = document.createElement('div');
+      value.className = 'price-value';
+      value.textContent = formatPrice(item.price);
+      itemDiv.append(name, value);
       priceListContainer.appendChild(itemDiv);
     });
   }
+  fitPriceList();
 
   // Detener el carrusel anterior si existía
   if (carouselInterval) {
@@ -456,7 +505,14 @@ function startPlayer(screenData) {
         el.loop = true;
         el.muted = true;
       } else {
-        el = document.createElement('img');
+        // Imagen completa (contain) sobre una copia difuminada que rellena el resto del panel
+        el = document.createElement('div');
+        for (const cls of ['bg', 'fg']) {
+          const img = document.createElement('img');
+          img.className = cls;
+          img.alt = '';
+          el.appendChild(img);
+        }
       }
       el.className = 'media-element';
       if (index === 0) el.classList.add('active');
@@ -474,7 +530,7 @@ function startPlayer(screenData) {
         style.id = 'dynamic-zoom-style';
         const existing = document.getElementById('dynamic-zoom-style');
         if(existing) existing.remove();
-        style.innerHTML = `body.transition-zoom #media-container img, body.transition-zoom #media-container video { transition: opacity 1s ease-in-out, transform ${durationMs/1000}s linear !important; }`;
+        style.innerHTML = `body.transition-zoom #media-container .media-element { transition: opacity 1s ease-in-out, transform ${durationMs/1000}s linear !important; }`;
         document.head.appendChild(style);
       }
       

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import fs from 'fs';
 import os from 'os';
-import csv from 'csv-parser';
+import { parseCsvFile, parsePrice, pick } from '../csv';
 import prisma from '../prisma';
 import { bid, requireBusiness } from '../auth';
 
@@ -23,21 +23,22 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Importar productos desde CSV
+// Importar productos desde CSV (separador , ; o tab; con o sin BOM)
 router.post('/upload-csv', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const filePath = req.file.path;
   const businessId = bid(req);
 
-  const rows: any[] = [];
   try {
-    await new Promise<void>((resolve, reject) => {
-      fs.createReadStream(filePath)
-        .pipe(csv())
-        .on('data', (data: any) => rows.push(data))
-        .on('end', () => resolve())
-        .on('error', reject);
-    });
+    const rows = await parseCsvFile(filePath);
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'El archivo no tiene filas de datos.' });
+    }
+    if (!('nombre' in rows[0]) && !('name' in rows[0])) {
+      return res.status(400).json({
+        error: 'No se encontró la columna "nombre". Revisá el encabezado de la primera fila (nombre, precio, codigo_interno, codigo_barra, descripcion).'
+      });
+    }
 
     let created = 0;
     let updated = 0;
@@ -45,15 +46,19 @@ router.post('/upload-csv', upload.single('file'), async (req, res) => {
 
     for (const [i, row] of rows.entries()) {
       try {
-        const name = (row.nombre || row.name || '').trim();
-        const price = parseFloat(String(row.precio || row.price || '').replace(',', '.'));
-        if (!name || Number.isNaN(price)) {
-          errors.push(`Fila ${i + 2}: nombre o precio inválido`);
+        const name = pick(row, 'nombre', 'name');
+        const price = parsePrice(pick(row, 'precio', 'price'));
+        if (!name) {
+          errors.push(`Fila ${i + 2}: falta el nombre`);
           continue;
         }
-        const internalCode = (row.codigo_interno || row.internalCode || '').trim() || null;
-        const barcode = (row.codigo_barra || row.barcode || '').trim() || null;
-        const description = (row.descripcion || row.description || '').trim() || null;
+        if (Number.isNaN(price)) {
+          errors.push(`Fila ${i + 2} (${name}): precio inválido "${pick(row, 'precio', 'price')}"`);
+          continue;
+        }
+        const internalCode = pick(row, 'codigo_interno', 'internalcode', 'codigo') || null;
+        const barcode = pick(row, 'codigo_barra', 'codigo_de_barra', 'codigo_de_barras', 'barcode') || null;
+        const description = pick(row, 'descripcion', 'description') || null;
         const data = { businessId, internalCode, barcode, name, price, description };
 
         // Actualizar si ya existe por código interno o de barras; si no, crear
@@ -70,7 +75,8 @@ router.post('/upload-csv', upload.single('file'), async (req, res) => {
           created++;
         }
       } catch (error) {
-        errors.push(`Fila ${i + 2}: ${error instanceof Error ? error.message : String(error)}`);
+        errors.push(`Fila ${i + 2}: error al guardar el artículo`);
+        console.error('CSV row error:', error);
       }
     }
 

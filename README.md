@@ -88,7 +88,11 @@ scp app/build/outputs/apk/debug/app-debug.apk root@SERVIDOR:/opt/carteleriaq/dow
 
 ## Importar productos por CSV
 
-Columnas: `nombre,precio` (obligatorias), `codigo_interno,codigo_barra,descripcion` (opcionales). Ver `articulos_importacion.csv`. Si el negocio ya tiene un producto con el mismo código interno o de barras, se actualiza.
+Columnas: `nombre` y `precio` (obligatorias), `codigo_interno`, `codigo_barra` y `descripcion` (opcionales). Acepta separador coma, punto y coma (Excel en español) o tabulador, UTF-8 con o sin BOM, y precios como `9500`, `9.500` o `$ 9.500,50`. Si el negocio ya tiene un artículo con el mismo código interno o de barras, se actualiza. El panel muestra cuántos se crearon/actualizaron y qué filas se rechazaron. Detalle completo en [docs/FORMATO-CATALOGO.md](docs/FORMATO-CATALOGO.md) (ejemplo: [docs/ejemplo-catalogo.csv](docs/ejemplo-catalogo.csv)).
+
+## Pantallas de TV (resoluciones y listas largas)
+
+El reproductor dimensiona todo en proporción al tamaño de la pantalla, así que se ve igual en 720p, 1080p y 4K. La lista de precios se achica sola hasta un 70% para que entren todos los artículos y, si son demasiados, se desplaza sola de arriba hacia abajo. Las imágenes se muestran completas (sin recortar) sobre una copia difuminada que rellena los bordes. Para el 4K conviene subir imágenes de 1920x1080 o mayores y videos H.264 de 1080p (los de 4K exigen mucho a los equipos baratos).
 
 ## Seguridad: qué está y qué falta
 

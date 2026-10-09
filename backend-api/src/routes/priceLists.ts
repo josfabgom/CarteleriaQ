@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import fs from 'fs';
 import os from 'os';
-import csv from 'csv-parser';
+import { parseCsvFile, parsePrice, pick } from '../csv';
 import prisma from '../prisma';
 import { bid, requireBusiness } from '../auth';
 
@@ -44,25 +44,17 @@ router.post('/upload-csv', upload.single('file'), async (req, res) => {
   const filePath = req.file.path;
   const listName = req.body.name || 'Lista Importada';
 
-  const rows: any[] = [];
   try {
-    await new Promise<void>((resolve, reject) => {
-      fs.createReadStream(filePath)
-        .pipe(csv())
-        .on('data', (data: any) => rows.push(data))
-        .on('end', () => resolve())
-        .on('error', reject);
-    });
-
+    const rows = await parseCsvFile(filePath);
     const newPriceList = await prisma.priceList.create({
       data: {
         name: listName,
         businessId: bid(req),
         items: {
           create: rows.map((row, index) => ({
-            productName: row.nombre || row.name || 'Producto Desconocido',
-            price: parseFloat(String(row.precio || row.price || '0').replace(',', '.')) || 0,
-            description: row.descripcion || row.description || '',
+            productName: pick(row, 'nombre', 'name') || 'Producto Desconocido',
+            price: parsePrice(pick(row, 'precio', 'price')) || 0,
+            description: pick(row, 'descripcion', 'description'),
             order: index
           }))
         }

@@ -98,6 +98,35 @@ const upload = (token, buf, name = 'x.png', type = 'image/png') => {
   const me = (await call('GET', '/api/auth/me', { token: A.token })).data;
   check('uso de espacio reportado', me.business.usage.storageUsedBytes === PNG.length);
 
+  console.log('Importación de catálogo (CSV)');
+  const uploadCsv = (token, text, name = 'catalogo.csv') => {
+    const form = new FormData();
+    form.append('file', new Blob([text], { type: 'text/csv' }), name);
+    return call('POST', '/api/products/upload-csv', { token, form });
+  };
+  // Como lo guarda Excel en español: punto y coma, BOM, CRLF, precios con formato local
+  const excelCsv = '﻿Código Interno;Nombre;Descripción;Precio\r\n' +
+    'X1;Pizza Muzzarella;Salsa y muzzarella;9.500\r\n' +
+    'X2;Empanada;Carne;$1.400\r\n' +
+    'X3;Gaseosa;;2200,50\r\n' +
+    'X4;;Sin nombre;100\r\n' +
+    'X5;Plato raro;;gratis\r\n';
+  const imp1 = await uploadCsv(A.token, excelCsv);
+  check('importa CSV de Excel (; + BOM + CRLF)', imp1.status === 201 && imp1.data.created === 3 && imp1.data.updated === 0, JSON.stringify(imp1.data));
+  check('informa las 2 filas rechazadas con motivo', imp1.data.errors?.length === 2 && /falta el nombre/.test(imp1.data.errors[0]) && /precio inválido/.test(imp1.data.errors[1]), JSON.stringify(imp1.data.errors));
+  const prods = (await call('GET', '/api/products', { token: A.token })).data;
+  const byCode = Object.fromEntries(prods.map((p) => [p.internalCode, p]));
+  check('precios con formato local bien interpretados', byCode.X1?.price === 9500 && byCode.X2?.price === 1400 && byCode.X3?.price === 2200.5, JSON.stringify(prods.map((p) => [p.internalCode, p.price])));
+  check('tildes y descripción conservadas', byCode.X1?.name === 'Pizza Muzzarella' && byCode.X1?.description === 'Salsa y muzzarella');
+  const imp2 = await uploadCsv(A.token, 'codigo_interno,nombre,precio\nX1,Pizza Muzzarella,10500\nX9,Nuevo,300\n');
+  const prods2 = (await call('GET', '/api/products', { token: A.token })).data;
+  check('reimportar actualiza por código sin duplicar', imp2.data.updated === 1 && imp2.data.created === 1 && prods2.filter((p) => p.internalCode === 'X1').length === 1 && prods2.find((p) => p.internalCode === 'X1').price === 10500, JSON.stringify(imp2.data));
+  const imp3 = await uploadCsv(A.token, 'articulo,valor\nPizza,100\n');
+  check('sin columna nombre -> 400 con mensaje claro', imp3.status === 400 && /nombre/.test(imp3.data.error), JSON.stringify(imp3.data));
+  check('archivo vacío -> 400', (await uploadCsv(A.token, 'nombre,precio\n')).status === 400);
+  check('B no ve los artículos importados por A', (await call('GET', '/api/products', { token: B.token })).data.every((p) => !['X1', 'X2', 'X3', 'X9'].includes(p.internalCode)));
+  check('importar sin sesión -> 401', (await uploadCsv(undefined, excelCsv)).status === 401);
+
   console.log('Pantallas y límite del plan');
   const reg1 = (await call('POST', '/api/screens/register')).data;
   const reg2 = (await call('POST', '/api/screens/register')).data;
