@@ -57,6 +57,7 @@ services:
       - "127.0.0.1:8095:80"
     volumes:
       - ./deploy/Caddyfile.internal:/etc/caddy/Caddyfile:ro
+      - ./downloads:/srv/downloads:ro # APK del reproductor (carpeta local, fuera de git)
     depends_on:
       - backend
       - dashboard

@@ -59,6 +59,7 @@ services:
       DOMAIN: ${DOMAIN:?Definí DOMAIN en .env (ej. carteleria.tudominio.com)}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./downloads:/srv/downloads:ro # APK del reproductor (carpeta local, fuera de git)
       - caddy_data:/data # certificados HTTPS
       - caddy_config:/config
     depends_on:

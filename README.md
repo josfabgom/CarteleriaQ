@@ -64,19 +64,25 @@ Restaurar la base: `gunzip -c backups/db-FECHA.sql.gz | docker compose -f docker
 
 ## Reproductor Android TV (APK)
 
+**Instalar en una TV:** instalá la app *Downloader* en la TV (Android TV / Google TV / Fire TV), abrila y escribí
+`https://carteleriaq.soporteq.tech/download/carteleriaq.apk`. Al terminar la descarga, Android pide permitir "instalar apps desconocidas" para Downloader (se acepta una vez). Alternativas: pendrive USB o `adb install -r carteleriaq.apk`.
+
+**Compilar y publicar una versión nueva** (requiere JDK 21 y el SDK de Android; `ANDROID_HOME`/`JAVA_HOME` definidos y `sdk.dir` en `player-app/android/local.properties`):
+
 ```bash
 cd player-app
-# 1) En config.js poner la URL del servidor: window.CARTELERIA_SERVER = 'https://carteleria.tudominio.com'
 npm install
-npm run build-web && npx cap sync android
-# 2) Compilar (requiere JDK 21 y el SDK de Android; ANDROID_HOME/JAVA_HOME definidos
-#    y sdk.dir en player-app/android/local.properties):
+# La URL del servidor se inyecta al compilar (config.js del repositorio queda vacío):
+CARTELERIA_SERVER=https://carteleriaq.soporteq.tech node build-web.js && npx cap sync android
 cd android && ./gradlew assembleDebug
 # APK: player-app/android/app/build/outputs/apk/debug/app-debug.apk
+
+# Publicarlo en el servidor (carpeta downloads/, fuera de git):
+scp app/build/outputs/apk/debug/app-debug.apk root@SERVIDOR:/opt/carteleriaq/downloads/carteleriaq.apk
 ```
 
-- Instalar en la TV: por USB/pendrive o `adb install -r app-debug.apk`. Es un APK de depuración; para publicar hace falta uno firmado de release.
-- Con la URL en `config.js` la TV no pregunta nada. Si se deja vacío, pide la IP/dirección al primer arranque.
+- Es un APK de depuración: sirve para instalar a mano, no para Google Play (eso requiere uno firmado de release).
+- Si se compila sin `CARTELERIA_SERVER`, la TV pregunta la dirección del servidor al primer arranque.
 - Sin servidor, la TV sigue mostrando lo último recibido y muestra "Sin conexión"; con **OK** en el control se puede cambiar el servidor.
 - Para que arranque sola al encender: conceder una vez *Mostrar sobre otras apps* (Ajustes > Apps > Acceso especial).
 

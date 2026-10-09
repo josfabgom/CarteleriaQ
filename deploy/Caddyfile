@@ -2,6 +2,14 @@
 {$DOMAIN} {
 	encode zstd gzip
 
+	# Descargas (APK del reproductor). Solo archivos concretos, sin listado de directorio.
+	handle_path /download/* {
+		root * /srv/downloads
+		header Content-Disposition "attachment"
+		header /*.apk Content-Type "application/vnd.android.package-archive"
+		file_server
+	}
+
 	# API, archivos subidos y reproductor web -> backend
 	@backend path /api/* /uploads/* /player/*
 	handle @backend {

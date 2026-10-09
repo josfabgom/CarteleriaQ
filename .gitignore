@@ -11,3 +11,4 @@ player-app/android/app/build/
 *.apk
 backups/
 *.tsbuildinfo
+downloads/
