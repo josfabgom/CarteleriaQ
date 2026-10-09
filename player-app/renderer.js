@@ -190,6 +190,7 @@ async function syncLoop(failures = 0) {
       saveCachedConfig(result.data);
       startPlayer(result.data);
     }
+    syncMediaCache(collectMediaUrls(result.data)); // también reintenta descargas pendientes
   } else {
     nextFailures = failures + 1;
     setOffline(true);
@@ -279,6 +280,94 @@ function resetPlayer() {
   initPlayer(); // Reiniciar flujo
 }
 
+// ---- Medios sin conexión (Cache API) ----
+// Cada imagen/video de la playlist se descarga a la caché del dispositivo y se reproduce desde ahí.
+// Solo disponible en contextos seguros (app nativa, localhost, https); si no, se usa la red como antes.
+const MEDIA_CACHE = 'carteleria-media-v1';
+const CACHE_ENABLED = typeof caches !== 'undefined';
+let blobUrls = [];
+let mediaSyncRunning = false;
+
+// Se cachea por ruta (/uploads/...) y no por servidor, así cambiar la IP no obliga a descargar todo otra vez
+const cacheKey = (url) =>
+  new URL(/^https?:/i.test(url) ? url : '/media-cache' + (url.startsWith('/') ? url : '/' + url), window.location.href).href;
+
+// Pedir al navegador que no borre la caché si falta espacio
+if (CACHE_ENABLED && navigator.storage && navigator.storage.persist) {
+  navigator.storage.persist().catch(() => {});
+}
+
+const collectMediaUrls = (config) =>
+  (config.playlist?.items || []).filter((i) => i.media).map((i) => i.media.url);
+
+async function syncMediaCache(urls) {
+  if (!CACHE_ENABLED || mediaSyncRunning) return;
+  mediaSyncRunning = true;
+  try {
+    const cache = await caches.open(MEDIA_CACHE);
+
+    // Descargar lo que falta (de a uno, para no saturar la red del local)
+    for (const url of urls) {
+      const key = cacheKey(url);
+      if (await cache.match(key)) continue;
+      try {
+        const res = await fetch(getMediaUrl(url), { mode: 'cors', cache: 'no-store' });
+        if (res.ok) await cache.put(key, res);
+      } catch (e) {
+        if (e && e.name === 'QuotaExceededError') {
+          console.error('Sin espacio para guardar más medios');
+          break;
+        }
+        // Sin red: se reintenta en el próximo sync
+      }
+    }
+
+    // Borrar lo que ya no está en la playlist
+    const wanted = new Set(urls.map(cacheKey));
+    for (const req of await cache.keys()) {
+      if (!wanted.has(req.url)) await cache.delete(req);
+    }
+  } catch (e) {
+    console.error('Error sincronizando medios:', e);
+  } finally {
+    mediaSyncRunning = false;
+  }
+}
+
+async function getCachedBlobUrl(url) {
+  if (!CACHE_ENABLED) return null;
+  try {
+    const cache = await caches.open(MEDIA_CACHE);
+    const res = await cache.match(cacheKey(url));
+    if (!res) return null;
+    const blobUrl = URL.createObjectURL(await res.blob());
+    blobUrls.push(blobUrl);
+    return blobUrl;
+  } catch (e) {
+    return null;
+  }
+}
+
+function revokeBlobUrls() {
+  blobUrls.forEach((u) => URL.revokeObjectURL(u));
+  blobUrls = [];
+}
+
+// Asigna el origen del medio: copia local si existe, red en caso contrario
+async function attachMedia(el, url) {
+  const cachedSrc = await getCachedBlobUrl(url);
+  if (!el.isConnected) { // se volvió a renderizar mientras cargaba
+    if (cachedSrc) URL.revokeObjectURL(cachedSrc);
+    return;
+  }
+  el.src = cachedSrc || getMediaUrl(url);
+  if (cachedSrc) {
+    // Si la copia local falla, intentar por red
+    el.addEventListener('error', () => { el.src = getMediaUrl(url); }, { once: true });
+  }
+  if (el.tagName === 'VIDEO' && el.classList.contains('active')) el.play().catch(() => {});
+}
+
 function getMediaUrl(url) {
   if (url.startsWith('http')) return url;
   // Limpiar posible barra inicial doble para URLs locales
@@ -324,6 +413,7 @@ function startPlayer(screenData) {
   }
 
   // Renderizar Medios (Carrusel)
+  revokeBlobUrls();
   mediaContainer.innerHTML = '';
   if (mediaItems.length > 0) {
     mediaItems.forEach((mItem, index) => {
@@ -331,16 +421,15 @@ function startPlayer(screenData) {
       let el;
       if (media.type === 'video' || media.url.match(/\.(mp4|webm|ogg)$/i)) {
         el = document.createElement('video');
-        el.src = getMediaUrl(media.url);
         el.loop = true;
         el.muted = true;
       } else {
         el = document.createElement('img');
-        el.src = getMediaUrl(media.url);
       }
       el.className = 'media-element';
       if (index === 0) el.classList.add('active');
       mediaContainer.appendChild(el);
+      attachMedia(el, media.url);
     });
 
     if (mediaItems.length > 1) {
@@ -375,7 +464,7 @@ function startPlayer(screenData) {
     }
   } else {
     // Si no hay medios, mostrar algo por defecto para no dejar vacío
-    mediaContainer.innerHTML = `<img src="https://images.unsplash.com/photo-1550547660-d9450f859349?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80" class="media-element active" />`;
+    mediaContainer.innerHTML = '<div class="media-element active" style="background:linear-gradient(135deg,#1e3a8a,#0f172a)"></div>';
   }
 }
 

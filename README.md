@@ -52,6 +52,7 @@ npm run build-web && npx cap sync android
 ```
 
 - La IP del servidor se pregunta al primer arranque (basta escribir `192.168.1.10`; el puerto 3000 se agrega solo). Se prueba la conexión antes de guardar. Para fijarla de fábrica, editar `player-app/config.js` (`CARTELERIA_SERVER`) antes de compilar.
+- Las imágenes y videos se descargan a la caché del dispositivo y se reproducen desde ahí; lo que sale de la playlist se borra solo. Funciona en la app nativa (y en `localhost`/https); en el navegador de una TV abierto por `http://IP:3000` se usa la red.
 - Si el servidor deja de responder, la TV sigue mostrando lo último recibido y muestra "Sin conexión"; con **OK** en el control se puede cambiar el servidor.
 - Para que arranque sola al encender la TV, conceder una vez *Mostrar sobre otras apps* a la app (Ajustes > Apps > Acceso especial).
 
