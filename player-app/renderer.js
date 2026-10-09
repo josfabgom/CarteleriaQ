@@ -33,44 +33,95 @@ const API_BASE = () => serverIp;
 
 let currentSyncData = null;
 let carouselInterval = null;
-let syncInterval = null;
+let syncInterval = null; // id del timeout del bucle de sincronización
+
+const SYNC_INTERVAL_MS = 10000;
+const MAX_BACKOFF_MS = 60000;
+const CONFIG_CACHE_KEY = 'lastConfig';
+
+// Indicador discreto de "sin conexión" (el contenido sigue reproduciéndose)
+const offlineBadge = document.createElement('div');
+offlineBadge.textContent = 'Sin conexión';
+offlineBadge.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:9000;padding:4px 10px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font:12px sans-serif;display:none;pointer-events:none';
+document.body.appendChild(offlineBadge);
+const setOffline = (offline) => { offlineBadge.style.display = offline ? 'block' : 'none'; };
+
+// Última configuración recibida, para poder reproducir sin servidor
+function saveCachedConfig(data) {
+  try { localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(data)); } catch (e) { /* almacenamiento lleno o no disponible */ }
+}
+function loadCachedConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_CACHE_KEY);
+    const data = raw ? JSON.parse(raw) : null;
+    return data && data.id === screenId ? data : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Resultado: { status: 'ok', data } | { status: 'gone' } (404: pantalla borrada) | { status: 'error' } (red o servidor)
+async function fetchSync() {
+  try {
+    const res = await fetch(`${API_BASE()}/api/screens/${screenId}/sync`, { cache: 'no-store' });
+    if (res.status === 404) return { status: 'gone' };
+    if (!res.ok) return { status: 'error' };
+    return { status: 'ok', data: await res.json() };
+  } catch (e) {
+    return { status: 'error' };
+  }
+}
+
+// Bucle de sincronización: nunca desvincula por errores de red, solo si el servidor dice que la pantalla no existe
+async function syncLoop(failures = 0) {
+  const result = await fetchSync();
+
+  if (result.status === 'gone') {
+    console.error('La pantalla ya no existe en el servidor');
+    setOffline(false);
+    try { localStorage.removeItem(CONFIG_CACHE_KEY); } catch (e) {}
+    return resetPlayer();
+  }
+
+  let nextFailures = 0;
+  if (result.status === 'ok') {
+    setOffline(false);
+    pairingContainer.style.display = 'none';
+    if (JSON.stringify(result.data) !== JSON.stringify(currentSyncData)) {
+      saveCachedConfig(result.data);
+      startPlayer(result.data);
+    }
+  } else {
+    nextFailures = failures + 1;
+    setOffline(true);
+    // Primer arranque sin red: reproducir lo último guardado
+    if (!currentSyncData) {
+      const cached = loadCachedConfig();
+      if (cached) {
+        pairingContainer.style.display = 'none';
+        startPlayer(cached);
+      } else {
+        pairingContainer.style.display = 'flex';
+        pairingContainer.innerHTML = '<h2 style="font-size:2rem">Sin conexión con el servidor. Reintentando…</h2>';
+      }
+    }
+  }
+
+  // Espera creciente (10s, 20s, 40s… hasta 60s) mientras no haya conexión
+  const delay = nextFailures ? Math.min(SYNC_INTERVAL_MS * 2 ** (nextFailures - 1), MAX_BACKOFF_MS) : SYNC_INTERVAL_MS;
+  syncInterval = setTimeout(() => syncLoop(nextFailures), delay);
+}
+
+function startSyncLoop() {
+  if (syncInterval) clearTimeout(syncInterval);
+  currentSyncData = null;
+  syncLoop();
+}
 
 // Función para inicializar o mostrar pantalla de vinculación
 async function initPlayer() {
   if (isPaired) {
-    // Validar si la pantalla aún existe en el servidor
-    try {
-      const check = await fetch(`${API_BASE()}/api/screens/${screenId}/sync`);
-      if (!check.ok) throw new Error("Screen not found");
-      
-      const screenData = await check.json();
-      pairingContainer.style.display = 'none';
-      startPlayer(screenData); 
-      
-      // Comenzar polling para actualizaciones
-      if (!syncInterval) {
-        syncInterval = setInterval(async () => {
-          try {
-            const res = await fetch(`${API_BASE()}/api/screens/${screenId}/sync`);
-            if (res.ok) {
-              const newData = await res.json();
-              if (JSON.stringify(newData) !== JSON.stringify(currentSyncData)) {
-                startPlayer(newData);
-              }
-            } else {
-              throw new Error("Screen not found");
-            }
-          } catch (err) {
-            console.error("Error sincronizando:", err);
-            // Si la pantalla fue borrada, reiniciar
-            resetPlayer();
-          }
-        }, 10000); // Polling cada 10 segundos
-      }
-    } catch (e) {
-      console.error(e);
-      resetPlayer();
-    }
+    startSyncLoop();
   } else {
     // Solicitar código de vinculación al servidor
     try {
@@ -88,17 +139,26 @@ async function initPlayer() {
 
       // Iniciar Polling cada 3 segundos para ver si el admin la vinculó
       const interval = setInterval(async () => {
-        const check = await fetch(`${API_BASE()}/api/screens/check-pairing/${pairingCode}`);
-        if (check.ok) {
-          const checkData = await check.json();
-          if (checkData.linked) {
+        try {
+          const check = await fetch(`${API_BASE()}/api/screens/check-pairing/${pairingCode}`);
+          if (check.status === 404) {
+            // El código expiró (se borra a la hora): pedir uno nuevo
             clearInterval(interval);
-            localStorage.setItem('screenId', checkData.screenId);
-            screenId = checkData.screenId;
-            isPaired = true;
-            pairingContainer.style.display = 'none';
-            initPlayer(); // Recargar ya vinculada
+            return initPlayer();
           }
+          if (check.ok) {
+            const checkData = await check.json();
+            if (checkData.linked) {
+              clearInterval(interval);
+              localStorage.setItem('screenId', checkData.screenId);
+              screenId = checkData.screenId;
+              isPaired = true;
+              pairingContainer.style.display = 'none';
+              initPlayer(); // Recargar ya vinculada
+            }
+          }
+        } catch (e) {
+          // Sin red: se reintenta en el próximo ciclo
         }
       }, 3000);
 
@@ -132,7 +192,7 @@ function resetPlayer() {
   localStorage.removeItem('screenId');
   screenId = null;
   isPaired = false;
-  if (syncInterval) clearInterval(syncInterval);
+  if (syncInterval) clearTimeout(syncInterval);
   syncInterval = null;
   if (carouselInterval) clearInterval(carouselInterval);
   carouselInterval = null;
