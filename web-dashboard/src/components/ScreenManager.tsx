@@ -123,7 +123,7 @@ const ScreenManager = () => {
       </div>
 
       <p className="text-gray-600 mb-6 text-sm">
-        Para agregar una nueva pantalla, instálale la App Reproductora, espera a que muestre el <b>Código de Vinculación (4 dígitos)</b> e ingresalo aquí abajo junto a sus datos.
+        Para agregar una nueva pantalla, instálale la App Reproductora, espera a que muestre el <b>Código de Vinculación (6 caracteres)</b> e ingresalo aquí abajo junto a sus datos.
       </p>
 
       {/* Vincular Pantalla */}
@@ -132,10 +132,10 @@ const ScreenManager = () => {
           <label className="block text-xs font-semibold text-gray-600 mb-1">Código de la TV</label>
           <input 
             type="text" 
-            placeholder="Ej: A1B2" 
+            placeholder="Ej: A1B2C3" 
             value={pairingCode}
             onChange={(e) => setPairingCode(e.target.value.toUpperCase().trim())}
-            maxLength={4}
+            maxLength={6}
             className="w-full border p-2 rounded text-sm text-center font-bold tracking-widest uppercase"
           />
         </div>
