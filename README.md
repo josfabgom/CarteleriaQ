@@ -48,8 +48,14 @@ Columnas: `nombre,precio` (obligatorias), `codigo_interno,codigo_barra,descripci
 cd player-app
 npm install
 npm run build-web && npx cap sync android
-# abrir player-app/android en Android Studio -> Build APK
+# Compilar (requiere JDK 21 y el SDK de Android; ANDROID_HOME y JAVA_HOME definidos,
+# y sdk.dir en player-app/android/local.properties):
+cd android && ./gradlew assembleDebug
+# APK: player-app/android/app/build/outputs/apk/debug/app-debug.apk
+# (o abrir player-app/android en Android Studio -> Build APK)
 ```
+
+El APK de depuración se instala por USB/adb o copiándolo a la TV (`adb install -r app-debug.apk`). Para publicar hace falta un APK firmado de release.
 
 - La IP del servidor se pregunta al primer arranque (basta escribir `192.168.1.10`; el puerto 3000 se agrega solo). Se prueba la conexión antes de guardar. Para fijarla de fábrica, editar `player-app/config.js` (`CARTELERIA_SERVER`) antes de compilar.
 - Las imágenes y videos se descargan a la caché del dispositivo y se reproducen desde ahí; lo que sale de la playlist se borra solo. Funciona en la app nativa (y en `localhost`/https); en el navegador de una TV abierto por `http://IP:3000` se usa la red.
