@@ -1,15 +1,15 @@
+# Producción (VPS). Uso:
+#   cp .env.production.example .env   (y completar)
+#   docker compose -f docker-compose.prod.yml up -d --build
 services:
   db:
     image: postgres:15-alpine
-    container_name: carteleria_db
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-carteleria_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definí POSTGRES_PASSWORD en .env}
       POSTGRES_DB: ${POSTGRES_DB:-carteleria_db}
-    # Solo accesible desde la máquina local; el backend usa la red interna de Docker
-    ports:
-      - "127.0.0.1:5432:5432"
+    # Sin puertos publicados: solo el backend accede por la red interna de Docker
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -22,10 +22,8 @@ services:
     build:
       context: ./backend-api
       dockerfile: Dockerfile
-    container_name: carteleria_backend
     restart: always
-    ports:
-      - "3000:3000"
+    # Sin puertos publicados: se accede a través de Caddy
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-carteleria_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-carteleria_db}?schema=public
       - PORT=3000
@@ -37,8 +35,8 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - uploads:/app/uploads # Medios persistentes
-      # Reproductor servido en /player (solo los archivos web)
+      - uploads:/app/uploads
+      # Solo los archivos del reproductor web (no todo el proyecto)
       - ./player-app/index.html:/player-app/index.html:ro
       - ./player-app/renderer.js:/player-app/renderer.js:ro
       - ./player-app/config.js:/player-app/config.js:ro
@@ -48,14 +46,27 @@ services:
       context: ./web-dashboard
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
-    container_name: carteleria_dashboard
+        VITE_API_URL: "" # mismo origen: Caddy reparte /api al backend
+    restart: always
+
+  caddy:
+    image: caddy:2-alpine
     restart: always
     ports:
-      - "8081:80"
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Definí DOMAIN en .env (ej. carteleria.tudominio.com)}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # certificados HTTPS
+      - caddy_config:/config
     depends_on:
       - backend
+      - dashboard
 
 volumes:
   pgdata:
   uploads:
+  caddy_data:
+  caddy_config:

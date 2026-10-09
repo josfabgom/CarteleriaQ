@@ -1,0 +1,18 @@
+# Enrutador interno (HTTP). El HTTPS lo termina otro proxy delante.
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	encode zstd gzip
+
+	@backend path /api/* /uploads/* /player/*
+	handle @backend {
+		reverse_proxy backend:3000
+	}
+
+	handle {
+		reverse_proxy dashboard:80
+	}
+}

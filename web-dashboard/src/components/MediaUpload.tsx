@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../config';
+import { apiFetch } from '../api';
 
 const MediaUpload = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -8,7 +9,7 @@ const MediaUpload = () => {
 
   const fetchMedia = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/media`);
+      const res = await apiFetch(`/api/media`);
       if (res.ok) {
         setMediaList(await res.json());
       }
@@ -38,7 +39,7 @@ const MediaUpload = () => {
     formData.append('file', file);
 
     try {
-      const res = await fetch(`${API_URL}/api/media/upload`, {
+      const res = await apiFetch(`/api/media/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -48,7 +49,8 @@ const MediaUpload = () => {
         setFile(null);
         fetchMedia(); // Refrescar lista
       } else {
-        setStatus('Error al subir el archivo.');
+        const body = await res.json().catch(() => null);
+        setStatus(body?.error || 'Error al subir el archivo.');
       }
     } catch (error) {
       setStatus('Error de red al intentar subir.');
@@ -58,7 +60,7 @@ const MediaUpload = () => {
   const handleDelete = async (id: string) => {
     if(!window.confirm('¿Eliminar este medio?')) return;
     try {
-      const res = await fetch(`${API_URL}/api/media/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/media/${id}`, { method: 'DELETE' });
       if (res.ok) fetchMedia();
     } catch (e) {
       console.error('Error deleting media');

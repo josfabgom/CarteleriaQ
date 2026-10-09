@@ -1,15 +1,15 @@
+# Para un servidor donde 80/443 ya los usa otro proyecto: sin Caddy público.
+# CarteleriaQ queda aislado (red y volúmenes propios) y solo escucha en 127.0.0.1:8095.
+#   docker compose -p carteleriaq -f docker-compose.shared.yml up -d --build
+# Acceso de prueba: ssh -L 8095:127.0.0.1:8095 usuario@servidor  ->  http://localhost:8095
 services:
   db:
     image: postgres:15-alpine
-    container_name: carteleria_db
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-carteleria_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definí POSTGRES_PASSWORD en .env}
       POSTGRES_DB: ${POSTGRES_DB:-carteleria_db}
-    # Solo accesible desde la máquina local; el backend usa la red interna de Docker
-    ports:
-      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -22,10 +22,7 @@ services:
     build:
       context: ./backend-api
       dockerfile: Dockerfile
-    container_name: carteleria_backend
     restart: always
-    ports:
-      - "3000:3000"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-carteleria_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-carteleria_db}?schema=public
       - PORT=3000
@@ -33,12 +30,13 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:?Definí ADMIN_USERNAME en .env}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Definí ADMIN_PASSWORD en .env}
       - CORS_ORIGIN=${CORS_ORIGIN:-}
+      # Cantidad de proxies delante del backend (edge = 1; con otro proxy HTTPS delante, 2)
+      - TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:-1}
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - uploads:/app/uploads # Medios persistentes
-      # Reproductor servido en /player (solo los archivos web)
+      - uploads:/app/uploads
       - ./player-app/index.html:/player-app/index.html:ro
       - ./player-app/renderer.js:/player-app/renderer.js:ro
       - ./player-app/config.js:/player-app/config.js:ro
@@ -48,13 +46,20 @@ services:
       context: ./web-dashboard
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
-    container_name: carteleria_dashboard
+        VITE_API_URL: "" # mismo origen
+    restart: always
+
+  # Reparte /api, /uploads y /player al backend y el resto al dashboard (HTTP interno, sin certificados)
+  edge:
+    image: caddy:2-alpine
     restart: always
     ports:
-      - "8081:80"
+      - "127.0.0.1:8095:80"
+    volumes:
+      - ./deploy/Caddyfile.internal:/etc/caddy/Caddyfile:ro
     depends_on:
       - backend
+      - dashboard
 
 volumes:
   pgdata:

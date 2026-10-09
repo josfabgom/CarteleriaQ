@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL } from '../config';
+import { apiFetch } from '../api';
 
 const PriceListManager = () => {
   const [priceLists, setPriceLists] = useState<any[]>([]);
@@ -13,8 +13,8 @@ const PriceListManager = () => {
   const fetchData = async () => {
     try {
       const [resLists, resCat] = await Promise.all([
-        fetch(`${API_URL}/api/pricelists`),
-        fetch(`${API_URL}/api/products`)
+        apiFetch(`/api/pricelists`),
+        apiFetch(`/api/products`)
       ]);
       if (resLists.ok) setPriceLists(await resLists.json());
       if (resCat.ok) setCatalog(await resCat.json());
@@ -30,7 +30,7 @@ const PriceListManager = () => {
   const createList = async () => {
     if (!newListName) return;
     try {
-      await fetch(`${API_URL}/api/pricelists`, {
+      await apiFetch(`/api/pricelists`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newListName })
@@ -44,7 +44,7 @@ const PriceListManager = () => {
 
   const deleteList = async (listId: string) => {
     if(!window.confirm('¿Eliminar lista completa?')) return;
-    await fetch(`${API_URL}/api/pricelists/${listId}`, { method: 'DELETE' });
+    await apiFetch(`/api/pricelists/${listId}`, { method: 'DELETE' });
     fetchData();
   };
 
@@ -54,7 +54,7 @@ const PriceListManager = () => {
     if (!product) return;
 
     try {
-      await fetch(`${API_URL}/api/pricelists/${selectedListId}/items`, {
+      await apiFetch(`/api/pricelists/${selectedListId}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -72,7 +72,7 @@ const PriceListManager = () => {
 
   const deleteItem = async (itemId: string) => {
     if(!window.confirm('¿Quitar producto de la lista?')) return;
-    await fetch(`${API_URL}/api/pricelists/items/${itemId}`, { method: 'DELETE' });
+    await apiFetch(`/api/pricelists/items/${itemId}`, { method: 'DELETE' });
     fetchData();
   };
 

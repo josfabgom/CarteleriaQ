@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL } from '../config';
+import { apiFetch } from '../api';
 
 const ProductManager = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -9,7 +9,7 @@ const ProductManager = () => {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/products`);
+      const res = await apiFetch(`/api/products`);
       if (res.ok) {
         const data = await res.json();
         setProducts(data);
@@ -33,11 +33,11 @@ const ProductManager = () => {
     
     try {
       const url = isEditing 
-        ? `${API_URL}/api/products/${formData.id}` 
-        : `${API_URL}/api/products`;
+        ? `/api/products/${formData.id}` 
+        : '/api/products';
       const method = isEditing ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -73,7 +73,7 @@ const ProductManager = () => {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Seguro que deseas eliminar este artículo?')) return;
-    await fetch(`${API_URL}/api/products/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/products/${id}`, { method: 'DELETE' });
     fetchProducts();
   };
 
@@ -93,7 +93,7 @@ const ProductManager = () => {
     formData.append('file', uploadFile);
 
     try {
-      const res = await fetch(`${API_URL}/api/products/upload-csv`, {
+      const res = await apiFetch(`/api/products/upload-csv`, {
         method: 'POST',
         body: formData,
       });

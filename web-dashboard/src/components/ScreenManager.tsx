@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../config';
+import { apiFetch } from '../api';
 
 const ScreenManager = () => {
   const [screens, setScreens] = useState<any[]>([]);
@@ -22,7 +23,7 @@ const ScreenManager = () => {
 
   const fetchScreens = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/screens`);
+      const res = await apiFetch(`/api/screens`);
       if (res.ok) setScreens(await res.json());
     } catch (e) {
       console.error(e);
@@ -39,7 +40,7 @@ const ScreenManager = () => {
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/api/screens/link`, {
+      const res = await apiFetch(`/api/screens/link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: pairingCode.trim(), name: newScreenName.trim(), location: newScreenLocation.trim() })
@@ -63,7 +64,7 @@ const ScreenManager = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Seguro que deseas eliminar esta pantalla? Deberás volver a vincularla.')) return;
     try {
-      await fetch(`${API_URL}/api/screens/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/screens/${id}`, { method: 'DELETE' });
       fetchScreens();
     } catch (e) {
       console.error(e);
@@ -84,8 +85,8 @@ const ScreenManager = () => {
     
     // Fetch options
     const [resPL, resMedia] = await Promise.all([
-      fetch(`${API_URL}/api/pricelists`),
-      fetch(`${API_URL}/api/media`)
+      apiFetch(`/api/pricelists`),
+      apiFetch(`/api/media`)
     ]);
     if (resPL.ok) setPriceLists(await resPL.json());
     if (resMedia.ok) setMediaList(await resMedia.json());
@@ -98,7 +99,7 @@ const ScreenManager = () => {
   const handleSaveAssignment = async () => {
     if (!selectedScreenId) return;
     try {
-      await fetch(`${API_URL}/api/screens/${selectedScreenId}/assign`, {
+      await apiFetch(`/api/screens/${selectedScreenId}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

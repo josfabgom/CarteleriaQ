@@ -4,14 +4,17 @@ import fs from 'fs';
 import os from 'os';
 import csv from 'csv-parser';
 import prisma from '../prisma';
+import { bid, requireBusiness } from '../auth';
 
 const router = Router();
+router.use(requireBusiness);
 const upload = multer({ dest: os.tmpdir(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // Obtener todos los productos
 router.get('/', async (req, res) => {
   try {
     const products = await prisma.product.findMany({
+      where: { businessId: bid(req) },
       orderBy: { name: 'asc' }
     });
     res.json(products);
@@ -24,6 +27,7 @@ router.get('/', async (req, res) => {
 router.post('/upload-csv', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const filePath = req.file.path;
+  const businessId = bid(req);
 
   const rows: any[] = [];
   try {
@@ -50,14 +54,14 @@ router.post('/upload-csv', upload.single('file'), async (req, res) => {
         const internalCode = (row.codigo_interno || row.internalCode || '').trim() || null;
         const barcode = (row.codigo_barra || row.barcode || '').trim() || null;
         const description = (row.descripcion || row.description || '').trim() || null;
-        const data = { internalCode, barcode, name, price, description };
+        const data = { businessId, internalCode, barcode, name, price, description };
 
         // Actualizar si ya existe por código interno o de barras; si no, crear
         const keys = [
           ...(internalCode ? [{ internalCode }] : []),
           ...(barcode ? [{ barcode }] : [])
         ];
-        const existing = keys.length ? await prisma.product.findFirst({ where: { OR: keys } }) : null;
+        const existing = keys.length ? await prisma.product.findFirst({ where: { businessId, OR: keys } }) : null;
         if (existing) {
           await prisma.product.update({ where: { id: existing.id }, data });
           updated++;
@@ -85,6 +89,7 @@ router.post('/', async (req, res) => {
     const { internalCode, barcode, name, description, price } = req.body;
     const newProduct = await prisma.product.create({
       data: {
+        businessId: bid(req),
         internalCode: internalCode || null,
         barcode: barcode || null,
         name,
@@ -105,8 +110,10 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { internalCode, barcode, name, description, price } = req.body;
+    const existing = await prisma.product.findFirst({ where: { id: String(req.params.id), businessId: bid(req) } });
+    if (!existing) return res.status(404).json({ error: 'Product not found' });
     const updated = await prisma.product.update({
-      where: { id: req.params.id },
+      where: { id: existing.id },
       data: {
         internalCode: internalCode || null,
         barcode: barcode || null,
@@ -127,7 +134,8 @@ router.put('/:id', async (req, res) => {
 // Eliminar producto
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.product.delete({ where: { id: req.params.id } });
+    const result = await prisma.product.deleteMany({ where: { id: String(req.params.id), businessId: bid(req) } });
+    if (result.count === 0) return res.status(404).json({ error: 'Product not found' });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Error deleting product' });

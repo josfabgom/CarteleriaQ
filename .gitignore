@@ -9,3 +9,5 @@ player-app/www/
 player-app/android/app/build/
 .DS_Store
 *.apk
+backups/
+*.tsbuildinfo

@@ -1,7 +1,8 @@
 // Variables de Estado
 let screenId = localStorage.getItem('screenId');
+let screenToken = localStorage.getItem('screenToken'); // credencial de esta pantalla (la entrega el servidor al vincular)
 let pairingCode = '';
-let isPaired = !!screenId;
+let isPaired = !!screenId && !!screenToken; // sin token (instalación anterior) hay que volver a vincular
 
 // Referencias del DOM
 const mediaContainer = document.getElementById('media-container');
@@ -40,6 +41,7 @@ let carouselInterval = null;
 let syncInterval = null; // id del timeout del bucle de sincronización
 
 const SYNC_INTERVAL_MS = 10000;
+const SYNC_TIMEOUT_MS = 8000;
 const MAX_BACKOFF_MS = 60000;
 const CONFIG_CACHE_KEY = 'lastConfig';
 
@@ -75,17 +77,25 @@ async function testServer(url) {
   }
 }
 
+// Con el teclado en pantalla de la TV, el formulario debe quedar arriba para no quedar tapado
+function setPairingLayout(top) {
+  pairingContainer.style.justifyContent = top ? 'flex-start' : 'center';
+  pairingContainer.style.paddingTop = top ? '4vh' : '0';
+  pairingContainer.style.boxSizing = 'border-box';
+}
+
 function showServerSetup(message, canCancel) {
   setupOpen = true;
   pairingContainer.style.display = 'flex';
+  setPairingLayout(true);
   pairingContainer.innerHTML = `
-    <h1 style="font-size: 2.5rem; margin-bottom: 16px;">Conectar con el servidor</h1>
-    <p style="font-size: 1.3rem; margin-bottom: 8px; color: #93c5fd; text-align: center; max-width: 800px;">
+    <h1 style="font-size: 2.2rem; margin-bottom: 10px;">Conectar con el servidor</h1>
+    <p style="font-size: 1.15rem; margin-bottom: 6px; color: #93c5fd; text-align: center; max-width: 800px;">
       Escribe la dirección IP de la PC donde corre Cartelería Q (ej. 192.168.1.10).<br>El puerto 3000 se agrega solo.
     </p>
-    <p id="setup-msg" style="font-size: 1.2rem; min-height: 1.6em; margin-bottom: 16px; color: #fca5a5; text-align: center; max-width: 800px;"></p>
-    <input id="server-input" type="text" inputmode="url" autocomplete="off" style="padding: 14px; font-size: 1.8rem; width: 520px; max-width: 90vw; color: #000; border-radius: 10px; border: 3px solid transparent; text-align: center;" />
-    <div style="margin-top: 24px; display: flex; gap: 16px;">
+    <p id="setup-msg" style="font-size: 1.1rem; min-height: 3.2em; margin-bottom: 10px; color: #fca5a5; text-align: center; max-width: 800px;"></p>
+    <input id="server-input" type="text" inputmode="url" autocomplete="off" placeholder="192.168.1.10" style="padding: 14px; font-size: 1.8rem; width: 520px; max-width: 90vw; color: #000; border-radius: 10px; border: 3px solid transparent; text-align: center;" />
+    <div style="margin-top: 16px; display: flex; gap: 16px;">
       <button id="server-connect" style="padding: 14px 36px; font-size: 1.5rem; border-radius: 10px; border: 3px solid transparent; cursor: pointer; color: #000;">Conectar</button>
       ${canCancel ? '<button id="server-cancel" style="padding: 14px 36px; font-size: 1.5rem; border-radius: 10px; border: 3px solid transparent; cursor: pointer; color: #000;">Cancelar</button>' : ''}
     </div>
@@ -95,7 +105,7 @@ function showServerSetup(message, canCancel) {
   const connectBtn = document.getElementById('server-connect');
   const cancelBtn = document.getElementById('server-cancel');
   msg.textContent = message || '';
-  input.value = serverIp || 'http://192.168.1.';
+  input.value = serverIp || '';
 
   // Resaltar el elemento enfocado (navegación con el D-pad del control)
   pairingContainer.querySelectorAll('input, button').forEach((el) => {
@@ -113,6 +123,7 @@ function showServerSetup(message, canCancel) {
       localStorage.setItem('serverIp', url);
       serverIp = url;
       setupOpen = false;
+      setPairingLayout(false);
       if (syncInterval) clearTimeout(syncInterval);
       syncInterval = null;
       currentSyncData = null;
@@ -131,6 +142,7 @@ function showServerSetup(message, canCancel) {
   if (cancelBtn) {
     cancelBtn.onclick = () => {
       setupOpen = false;
+      setPairingLayout(false);
       pairingContainer.style.display = 'none';
     };
   }
@@ -159,15 +171,25 @@ function loadCachedConfig() {
   }
 }
 
-// Resultado: { status: 'ok', data } | { status: 'gone' } (404: pantalla borrada) | { status: 'error' } (red o servidor)
+// Resultado: { status: 'ok', data } | { status: 'gone' } (401/404: pantalla borrada o sin acceso) | { status: 'error' } (red o servidor)
 async function fetchSync() {
+  // Un servidor inalcanzable puede no responder ni rechazar: sin límite la petición quedaría colgada
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SYNC_TIMEOUT_MS);
   try {
-    const res = await fetch(`${API_BASE()}/api/screens/${screenId}/sync`, { cache: 'no-store' });
-    if (res.status === 404) return { status: 'gone' };
+    const res = await fetch(`${API_BASE()}/api/screens/${screenId}/sync`, {
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${screenToken}` }
+    });
+    // 401/404: la pantalla fue borrada o su token ya no vale -> hay que vincular de nuevo
+    if (res.status === 401 || res.status === 404) return { status: 'gone' };
     if (!res.ok) return { status: 'error' };
     return { status: 'ok', data: await res.json() };
   } catch (e) {
     return { status: 'error' };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -215,6 +237,12 @@ async function syncLoop(failures = 0) {
 function startSyncLoop() {
   if (syncInterval) clearTimeout(syncInterval);
   currentSyncData = null;
+  // Reproducir de inmediato lo último guardado; el sync posterior solo lo reemplaza si cambió
+  const cached = loadCachedConfig();
+  if (cached && !setupOpen) {
+    pairingContainer.style.display = 'none';
+    startPlayer(cached);
+  }
   syncLoop();
 }
 
@@ -252,7 +280,9 @@ async function initPlayer() {
             if (checkData.linked) {
               clearInterval(interval);
               localStorage.setItem('screenId', checkData.screenId);
+              localStorage.setItem('screenToken', checkData.token);
               screenId = checkData.screenId;
+              screenToken = checkData.token;
               isPaired = true;
               pairingContainer.style.display = 'none';
               initPlayer(); // Recargar ya vinculada
@@ -271,7 +301,9 @@ async function initPlayer() {
 
 function resetPlayer() {
   localStorage.removeItem('screenId');
+  localStorage.removeItem('screenToken');
   screenId = null;
+  screenToken = null;
   isPaired = false;
   if (syncInterval) clearTimeout(syncInterval);
   syncInterval = null;

@@ -1,0 +1,15 @@
+# Caddy obtiene y renueva el certificado HTTPS (Let's Encrypt) solo para {$DOMAIN}
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API, archivos subidos y reproductor web -> backend
+	@backend path /api/* /uploads/* /player/*
+	handle @backend {
+		reverse_proxy backend:3000
+	}
+
+	# Todo lo demás -> dashboard
+	handle {
+		reverse_proxy dashboard:80
+	}
+}

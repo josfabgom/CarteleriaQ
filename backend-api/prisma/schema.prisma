@@ -6,12 +6,44 @@ datasource db {
   provider = "postgresql"
 }
 
+// Cliente (negocio) al que se le vende el servicio. Todos sus datos cuelgan de aquí.
+model Business {
+  id             String   @id @default(uuid())
+  name           String
+  active         Boolean  @default(true)
+  maxScreens     Int      @default(3)
+  storageLimitMb Int      @default(1024)
+  user           User?
+  screens        Screen[]
+  playlists      Playlist[]
+  media          Media[]
+  priceLists     PriceList[]
+  products       Product[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  passwordHash String
+  role         String    @default("business") // superadmin | business
+  businessId   String?   @unique // un solo usuario por negocio
+  business     Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
 model Screen {
   id            String    @id @default(uuid())
   name          String
   location      String?
-  status        String    @default("offline") // online, offline
+  status        String    @default("offline") // pending, online, offline
   pairingCode   String?   @unique
+  businessId    String? // null mientras la pantalla está sin vincular
+  business      Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  tokenHash     String? // SHA-256 del token que usa la TV para sincronizar
+  pairingToken  String? // token en claro solo hasta el primer sync (la TV lo recibe al vincularse)
   playlist      Playlist? @relation(fields: [playlistId], references: [id], onDelete: SetNull)
   playlistId    String?
   layout        String    @default("split") // split, full-media, full-menu
@@ -23,65 +55,76 @@ model Screen {
 }
 
 model Playlist {
-  id        String   @id @default(uuid())
-  name      String
-  items     PlaylistItem[]
-  screens   Screen[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String         @id @default(uuid())
+  name       String
+  businessId String
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items      PlaylistItem[]
+  screens    Screen[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 }
 
 model PlaylistItem {
-  id         String   @id @default(uuid())
-  playlistId String
-  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
-  mediaId    String?
-  media      Media?   @relation(fields: [mediaId], references: [id])
+  id          String     @id @default(uuid())
+  playlistId  String
+  playlist    Playlist   @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  mediaId     String?
+  media       Media?     @relation(fields: [mediaId], references: [id], onDelete: Cascade)
   priceListId String?
-  priceList  PriceList? @relation(fields: [priceListId], references: [id])
-  duration   Int      @default(10) // duration in seconds
-  order      Int
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  priceList   PriceList? @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  duration    Int        @default(10) // duration in seconds
+  order       Int
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
 model Media {
-  id        String   @id @default(uuid())
-  name      String
-  type      String   // image, video
-  url       String   // local path or s3 url
-  size      Int?     // bytes
-  items     PlaylistItem[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String         @id @default(uuid())
+  name       String
+  type       String // image, video
+  url        String // /uploads/<businessId>/<archivo>
+  size       Int? // bytes
+  businessId String
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items      PlaylistItem[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 }
 
 model PriceList {
-  id        String   @id @default(uuid())
-  name      String
-  items     PriceItem[]
+  id            String         @id @default(uuid())
+  name          String
+  businessId    String
+  business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items         PriceItem[]
   playlistItems PlaylistItem[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model PriceItem {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   priceListId String
   priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
   productName String
   description String?
   price       Float
-  order       Int      @default(0)
+  order       Int       @default(0)
 }
 
 model Product {
   id           String   @id @default(uuid())
-  internalCode String?  @unique
-  barcode      String?  @unique
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  internalCode String?
+  barcode      String?
   name         String
   description  String?
   price        Float
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@unique([businessId, internalCode])
+  @@unique([businessId, barcode])
 }
