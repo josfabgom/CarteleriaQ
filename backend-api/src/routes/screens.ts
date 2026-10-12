@@ -319,8 +319,11 @@ router.put('/:id', requireBusiness, async (req, res) => {
 // Borrar pantalla (su token deja de valer y la TV vuelve a pedir vinculación)
 router.delete('/:id', requireBusiness, async (req, res) => {
   try {
-    const result = await prisma.screen.deleteMany({ where: { id: String(req.params.id), businessId: bid(req) } });
-    if (result.count === 0) return res.status(404).json({ error: 'Screen not found' });
+    const screen = await prisma.screen.findFirst({ where: { id: String(req.params.id), businessId: bid(req) }, include: { playlist: true } });
+    if (!screen) return res.status(404).json({ error: 'Screen not found' });
+    await prisma.screen.delete({ where: { id: screen.id } });
+    // El ciclo propio de la pantalla (configuración rápida) no tiene sentido sin ella
+    if (screen.playlist?.private) await prisma.playlist.deleteMany({ where: { id: screen.playlist.id, screens: { none: {} } } });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Error deleting screen' });

@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de CarteleriaQ</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm 22mm 18mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Calibri, Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1f2937; margin: 0; }
+  h1, h2, h3 { color: #0f172a; line-height: 1.2; }
+  h1 { font-size: 22pt; margin: 0 0 6mm; padding-bottom: 3mm; border-bottom: 3px solid #e63946; page-break-before: always; }
+  h1.first { page-break-before: auto; }
+  h2 { font-size: 14pt; margin: 8mm 0 3mm; color: #b91c1c; }
+  h3 { font-size: 11.5pt; margin: 5mm 0 2mm; }
+  p { margin: 0 0 3mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.2mm; }
+  code { font-family: Consolas, monospace; background: #f1f5f9; padding: 0 1.5mm; border-radius: 1mm; font-size: 9.5pt; }
+  pre { font-family: Consolas, monospace; background: #0f172a; color: #e2e8f0; padding: 3mm 4mm; border-radius: 2mm; font-size: 9pt; white-space: pre-wrap; margin: 0 0 4mm; }
+  table { border-collapse: collapse; width: 100%; margin: 0 0 4mm; font-size: 9.8pt; }
+  th { background: #0f172a; color: #fff; text-align: left; padding: 2mm 3mm; }
+  td { border-bottom: 1px solid #e5e7eb; padding: 2mm 3mm; vertical-align: top; }
+  tr { page-break-inside: avoid; }
+  .note, .tip, .warn { padding: 3mm 4mm; border-radius: 2mm; margin: 0 0 4mm; border-left: 4px solid; page-break-inside: avoid; }
+  .note { background: #eff6ff; border-color: #2563eb; }
+  .tip { background: #ecfdf5; border-color: #059669; }
+  .warn { background: #fff7ed; border-color: #ea580c; }
+  .note b:first-child, .tip b:first-child, .warn b:first-child { display: block; margin-bottom: 1mm; }
+  .steps { counter-reset: s; list-style: none; padding-left: 0; }
+  .steps li { counter-increment: s; position: relative; padding-left: 9mm; margin-bottom: 2.5mm; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 6mm; height: 6mm; border-radius: 50%; background: #e63946; color: #fff; font-weight: 700; font-size: 9pt; text-align: center; line-height: 6mm; }
+  figure { margin: 0 0 4mm; page-break-inside: avoid; }
+  figure img { width: 100%; border-radius: 2mm; border: 1px solid #cbd5e1; }
+  figcaption { font-size: 9pt; color: #64748b; margin-top: 1mm; }
+  .two { display: flex; gap: 4mm; }
+  .two > * { flex: 1; }
+  kbd { background: #e2e8f0; border-radius: 1mm; padding: 0 1.5mm; font-size: 9.5pt; }
+
+  .cover { height: 245mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+  .cover .logo { width: 28mm; height: 28mm; border-radius: 7mm; background: linear-gradient(135deg, #e63946, #7d0f17); color: #fff; font-size: 40pt; font-weight: 800; display: flex; align-items: center; justify-content: center; margin-bottom: 10mm; }
+  .cover h1 { font-size: 38pt; border: 0; margin: 0 0 3mm; padding: 0; page-break-before: auto; }
+  .cover p { font-size: 15pt; color: #475569; }
+  .cover .meta { margin-top: 30mm; font-size: 10pt; color: #64748b; }
+  .toc { columns: 2; column-gap: 12mm; font-size: 10.5pt; }
+  .toc div { margin-bottom: 2mm; break-inside: avoid; }
+  .toc b { color: #b91c1c; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="logo">Q</div>
+  <h1>CarteleriaQ</h1>
+  <p>Manual de uso: cómo trabajar con todo el sistema</p>
+  <p style="font-size:11pt">Cartelería digital para cualquier negocio: carnicería, verdulería, ferretería, panadería, gastronomía y más.</p>
+  <div class="meta">
+    Panel de gestión: https://carteleriaq.soporteq.tech<br>
+    Descarga de la app para TV: https://carteleriaq.soporteq.tech/download/carteleriaq.apk
+  </div>
+</div>
+
+<h1 class="first">Índice</h1>
+<div class="toc">
+  <div><b>1.</b> Cómo funciona el sistema</div>
+  <div><b>2.</b> Primeros pasos (resumen de 10 minutos)</div>
+  <div><b>3.</b> Instalar y vincular una TV</div>
+  <div><b>4.</b> Catálogo de artículos</div>
+  <div><b>5.</b> Importar artículos desde Excel/CSV</div>
+  <div><b>6.</b> Listas de pantalla</div>
+  <div><b>7.</b> Medios y promociones</div>
+  <div><b>8.</b> Ajuste de precios</div>
+  <div><b>9.</b> Ciclos y escenas</div>
+  <div><b>10.</b> La cartelera completa</div>
+  <div><b>11.</b> Ofertas</div>
+  <div><b>12.</b> Pantallas: asignar y configurar</div>
+  <div><b>13.</b> Qué pasa sin internet y cómo se actualiza</div>
+  <div><b>14.</b> Ejemplo completo: una carnicería</div>
+  <div><b>15.</b> Para el administrador</div>
+  <div><b>16.</b> Problemas frecuentes</div>
+  <div><b>17.</b> Límites y datos útiles</div>
+</div>
+
+<h1>1. Cómo funciona el sistema</h1>
+<p>CarteleriaQ tiene tres partes que trabajan juntas:</p>
+<table>
+  <tr><th style="width:32%">Parte</th><th>Qué es</th></tr>
+  <tr><td><b>Panel de gestión</b></td><td>La página web donde cargás los artículos, las fotos y armás qué se muestra. Se entra con usuario y contraseña desde cualquier computadora o celular.</td></tr>
+  <tr><td><b>Servidor en la nube</b></td><td>Guarda todo. No hay que instalar nada en el local: las TVs se conectan a internet y se actualizan solas.</td></tr>
+  <tr><td><b>Reproductor en la TV</b></td><td>La app que muestra la cartelería. Funciona en Android TV / Google TV / Fire TV (APK), en Windows y en navegadores.</td></tr>
+</table>
+
+<h2>Las piezas que vas a usar</h2>
+<table>
+  <tr><th style="width:26%">Pieza</th><th>Para qué sirve</th></tr>
+  <tr><td><b>Catálogo de artículos</b></td><td>Es tu inventario base: cada artículo con precio, unidad (kg, unidad…), categoría, foto, etiqueta y stock. <b>Es la fuente de verdad de los precios.</b></td></tr>
+  <tr><td><b>Lista de pantalla</b></td><td>Una selección de artículos del catálogo para mostrar (por ejemplo "Precios del día"). Si cambiás un precio en el catálogo, todas las listas y pantallas se actualizan solas.</td></tr>
+  <tr><td><b>Medios</b></td><td>Tus imágenes y videos de promoción.</td></tr>
+  <tr><td><b>Escena</b></td><td>Una "diapositiva" de la pantalla: una lista de precios, las ofertas, una imagen o video, un anuncio de texto, o la cartelera completa.</td></tr>
+  <tr><td><b>Ciclo</b></td><td>Un conjunto de escenas que rotan una tras otra, cada una con su duración. Un ciclo se puede asignar a <b>varias pantallas a la vez</b>.</td></tr>
+  <tr><td><b>Pantalla</b></td><td>Cada TV vinculada. Tiene asignado un ciclo.</td></tr>
+</table>
+
+<div class="tip"><b>La idea central</b>
+Los datos se cargan <b>una sola vez</b> (catálogo y medios) y se combinan en listas, escenas y ciclos. Cambiás algo en un lugar y todas las TVs lo reflejan en pocos segundos.</div>
+
+<h2>Quién hace qué</h2>
+<ul>
+  <li><b>Administrador</b> (quien vende el servicio): crea los negocios, les da usuario y contraseña y fija sus límites (cantidad de pantallas y espacio de archivos).</li>
+  <li><b>Negocio</b>: tiene un usuario. Solo ve y edita sus propios datos. Arma su catálogo, sus listas, sus ciclos y vincula sus TVs.</li>
+</ul>
+
+<h1>2. Primeros pasos (resumen de 10 minutos)</h1>
+<p>Si recién empezás, este es el camino más corto para ver algo en la TV:</p>
+<ol class="steps">
+  <li><b>Entrá al panel</b> con el usuario y contraseña que te dio el administrador.</li>
+  <li><b>Cargá tus artículos</b>: en <i>Catálogo de Artículos</i>, uno por uno o importando un archivo de Excel/CSV (capítulo 5).</li>
+  <li><b>Creá una lista</b> en <i>Listas de Pantalla</i> y agregale artículos "Del catálogo".</li>
+  <li><b>Subí fotos o videos</b> de promoción en <i>Medios &amp; Promociones</i> (opcional).</li>
+  <li><b>Instalá la app en la TV</b> y anotá el código de 6 caracteres que muestra (capítulo 3).</li>
+  <li><b>Vinculá la TV</b> en <i>Pantallas</i> con ese código.</li>
+  <li><b>Creá un ciclo</b> en <i>Ciclos</i> (por ejemplo "Cartelera completa") y asignalo a la pantalla.</li>
+</ol>
+<p>En unos segundos la TV muestra el contenido. A partir de ahí, los cambios de precios, fotos o stock llegan solos.</p>
+
+<h2>El panel por dentro</h2>
+<table>
+  <tr><th style="width:30%">Menú</th><th>Qué hacés ahí</th></tr>
+  <tr><td>Inicio</td><td>Resumen y accesos rápidos.</td></tr>
+  <tr><td>Pantallas</td><td>Vincular TVs, asignarles un ciclo, elegir transición, ver la versión del reproductor.</td></tr>
+  <tr><td>Medios &amp; Promociones</td><td>Subir y borrar imágenes y videos.</td></tr>
+  <tr><td>Catálogo de Artículos</td><td>Tu inventario: alta, edición, foto, stock, importación por CSV.</td></tr>
+  <tr><td>Ajuste de precios</td><td>Subir o bajar precios en masa, ahora o programado, con historial y deshacer.</td></tr>
+  <tr><td>Listas de Pantalla</td><td>Armar las listas que se muestran.</td></tr>
+  <tr><td>Ciclos</td><td>Armar las secuencias de escenas.</td></tr>
+  <tr><td>Mi cuenta</td><td>Cambiar tu contraseña.</td></tr>
+</table>
+<p>En la barra lateral ves cuántas pantallas y cuánto espacio llevás usados de tu plan.</p>
+
+<h1>3. Instalar y vincular una TV</h1>
+<h2>Instalar la app (Android TV / Google TV / Fire TV)</h2>
+<ol class="steps">
+  <li>En la TV, instalá la app gratuita <b>Downloader</b> desde la tienda.</li>
+  <li>Abrila y escribí la dirección de descarga: <code>https://carteleriaq.soporteq.tech/download/carteleriaq.apk</code></li>
+  <li>Al terminar la descarga, Android pide permitir "instalar apps desconocidas" para Downloader. Aceptá (se hace una sola vez) e instalá.</li>
+  <li>Abrí <b>CarteleriaQ</b>. La TV muestra un <b>código de 6 caracteres</b> (por ejemplo A1B2C3).</li>
+</ol>
+<div class="note"><b>Otras formas de instalar</b>
+Con un pendrive USB (copiá el archivo .apk y abrilo desde un explorador de archivos de la TV) o por cable con <code>adb install -r carteleriaq.apk</code>. En una PC con Windows también hay una versión de escritorio y se puede abrir el reproductor web en <code>https://carteleriaq.soporteq.tech/player</code>.</div>
+
+<h2>Vincular la TV con el panel</h2>
+<ol class="steps">
+  <li>En el panel, entrá a <b>Pantallas</b>.</li>
+  <li>En "Vincular Pantalla" completá: <b>Código de la TV</b> (el que ves en el televisor), <b>Nombre identificador</b> (por ejemplo "TV Mostrador") y, si querés, la <b>Ubicación</b>.</li>
+  <li>Tocá <b>Vincular Pantalla</b>. La TV pasa a estado en línea y muestra la espera hasta que le asignes un ciclo.</li>
+</ol>
+<div class="warn"><b>Importante</b>
+Cada negocio puede vincular hasta su <b>máximo de pantallas</b> (lo fija el administrador). Si se borra una pantalla del panel, esa TV vuelve a pedir un código nuevo.</div>
+
+<h2>Funciona en cualquier TV</h2>
+<p>El reproductor se adapta solo al tamaño: se ve igual en HD, Full HD y 4K.</p>
+
+<h1>4. Catálogo de artículos</h1>
+<p>El catálogo es la base de todo. Cada artículo tiene:</p>
+<table>
+  <tr><th style="width:28%">Dato</th><th>Detalle</th></tr>
+  <tr><td>Nombre y descripción</td><td>Como se verá en la TV.</td></tr>
+  <tr><td>Precio</td><td>El precio vigente.</td></tr>
+  <tr><td>Unidad de venta</td><td>kg, 100 g, unidad, litro, docena… Se muestra junto al precio ("$12.900 / kg"). Si es "unidad" no se muestra.</td></tr>
+  <tr><td>Categoría</td><td>Sección libre (Vacuno, Pollo, Lácteos…). Sirve para agrupar en pantalla, filtrar escenas y ajustar precios.</td></tr>
+  <tr><td>Precio anterior</td><td>Si es mayor al actual, se muestra tachado y el artículo cuenta como <b>oferta</b> con su descuento calculado.</td></tr>
+  <tr><td>Etiqueta</td><td>Un cartelito (OFERTA, NUEVO…, hasta 24 caracteres).</td></tr>
+  <tr><td>Stock</td><td>Disponible o no. Sin stock se ve atenuado como AGOTADO (o se oculta, según la lista).</td></tr>
+  <tr><td>Foto</td><td>Se elige entre tus imágenes subidas. Sin foto, la pantalla muestra la inicial del nombre.</td></tr>
+  <tr><td>Código interno / de barras</td><td>Tu código propio, único dentro de tu negocio. Permite actualizar artículos por importación.</td></tr>
+</table>
+<h2>Cargar y editar</h2>
+<ul>
+  <li><b>Uno por uno</b>: botón de nuevo artículo en <i>Catálogo de Artículos</i>.</li>
+  <li><b>Editar</b>: cambiás precio, foto, stock o etiqueta. Se actualiza en <b>todas las pantallas</b> que lo muestran.</li>
+  <li><b>Marcar sin stock</b>: apagás la disponibilidad y el artículo se atenúa o desaparece de la TV sin tocar listas.</li>
+  <li><b>Ofertas</b>: cargá un <b>precio anterior</b> mayor al precio (o la etiqueta OFERTA) y el artículo entra solo en las escenas de ofertas automáticas.</li>
+</ul>
+
+<h1>5. Importar artículos desde Excel/CSV</h1>
+<p>Para cargar muchos artículos de golpe: <b>Catálogo de Artículos → Importar Artículos desde CSV</b>. En Excel, guardá como <i>CSV UTF-8</i>. Se aceptan separadores coma, punto y coma o tabulador, y se detecta solo.</p>
+<table>
+  <tr><th style="width:24%">Columna</th><th style="width:14%">Obligatoria</th><th>Ejemplo / detalle</th></tr>
+  <tr><td><code>nombre</code></td><td>Sí</td><td>Asado de tira</td></tr>
+  <tr><td><code>precio</code></td><td>Sí</td><td>12900 · 12.900,50 · $ 12.900 (todos se entienden)</td></tr>
+  <tr><td><code>codigo_interno</code></td><td>Recomendada</td><td>V01. Si ya existe, el artículo se actualiza; si no, se crea.</td></tr>
+  <tr><td><code>codigo_barra</code></td><td>No</td><td>7791813421007</td></tr>
+  <tr><td><code>descripcion</code></td><td>No</td><td>Corte tradicional</td></tr>
+  <tr><td><code>categoria</code></td><td>No</td><td>Vacuno</td></tr>
+  <tr><td><code>unidad</code></td><td>No</td><td>kg, 100 g, litro…</td></tr>
+  <tr><td><code>precio_anterior</code></td><td>No</td><td>14500 (se muestra tachado)</td></tr>
+  <tr><td><code>etiqueta</code></td><td>No</td><td>OFERTA, NUEVO</td></tr>
+  <tr><td><code>disponible</code></td><td>No</td><td>si / no</td></tr>
+</table>
+<p>La primera fila es el encabezado y el orden de las columnas no importa. Mayúsculas y tildes se toleran (<code>Nombre</code>, <code>PRECIO</code>, <code>Código Interno</code>).</p>
+<pre>codigo_interno;nombre;categoria;unidad;precio;precio_anterior;etiqueta
+V01;Asado de tira;Vacuno;kg;12900;14500;OFERTA
+V02;Vacío;Vacuno;kg;15800;;
+P01;Pollo entero;Pollo;kg;4600;5200;OFERTA</pre>
+<div class="tip"><b>Cosas útiles</b>
+<ul style="margin:0">
+  <li>Las columnas que <b>no incluís no se tocan</b>: un archivo con solo <code>codigo_interno,nombre,precio</code> actualiza precios sin borrar categoría, unidad ni etiqueta.</li>
+  <li>Sin <code>codigo_interno</code> ni <code>codigo_barra</code>, cada importación crea el artículo de nuevo (duplicados). Conviene siempre ponerlo.</li>
+  <li>Al terminar, el panel muestra cuántos fueron nuevos, cuántos actualizados y qué filas se rechazaron y por qué (el número de fila es el de Excel).</li>
+  <li>La <b>foto</b> no se importa por archivo: se elige después, artículo por artículo.</li>
+  <li>Tamaño máximo del archivo: 5 MB. Hay archivos de ejemplo en la carpeta <code>docs</code> del proyecto.</li>
+</ul></div>
+
+<h1>6. Listas de pantalla</h1>
+<p>Una lista es una selección de artículos para mostrar. Se arma en <b>Listas de Pantalla</b>.</p>
+<ol class="steps">
+  <li>Creá una lista nueva con un nombre (por ejemplo "Precios del día").</li>
+  <li><b>+ Del catálogo</b>: elegí artículos con búsqueda y selección múltiple. Quedan <b>enlazados</b>: muestran siempre el precio, foto y stock actuales del catálogo.</li>
+  <li><b>+ Manual</b> (opcional): un artículo con precio propio, independiente del catálogo. No se actualiza solo.</li>
+  <li>Ordenalos como quieras.</li>
+</ol>
+<h3>Opciones de la lista</h3>
+<ul>
+  <li><b>Agrupar por categoría</b>: la pantalla muestra un título por cada categoría.</li>
+  <li><b>Ocultar los sin stock</b>: si está apagado, los agotados se ven atenuados con la etiqueta AGOTADO.</li>
+</ul>
+<h3>Estilos de visualización</h3>
+<table>
+  <tr><th style="width:28%">Estilo</th><th>Cuándo conviene</th></tr>
+  <tr><td><b>Lista</b></td><td>Nombre, etiqueta, precio y unidad. La más compacta, ideal para listas largas.</td></tr>
+  <tr><td><b>Lista con fotos</b></td><td>Una fila por artículo con miniatura, nombre, descripción y precio.</td></tr>
+  <tr><td><b>Tarjetas con fotos</b></td><td>Grilla con foto grande. Las columnas se adaptan a la cantidad de artículos.</td></tr>
+</table>
+<p>Si la lista no entra en el alto de la pantalla, el reproductor achica la letra (hasta 70 %) y, si todavía no entra, la desplaza sola de arriba hacia abajo.</p>
+
+<h1>7. Medios y promociones</h1>
+<p>En <b>Medios &amp; Promociones</b> subís imágenes y videos (promociones, fotos del local, fotos de productos).</p>
+<ul>
+  <li>Elegí el archivo; aparece en la <b>galería</b> de medios subidos.</li>
+  <li>Para borrar, usá el botón de la galería. Al borrar un archivo, se quitan solo las escenas que lo usaban y los artículos que lo tenían de foto quedan sin foto (no se rompe nada).</li>
+  <li>Cada negocio tiene un <b>espacio de almacenamiento</b> limitado (en la barra lateral ves cuánto usaste). Si se llena, no se pueden subir más archivos hasta borrar alguno.</li>
+</ul>
+<div class="tip"><b>Recomendaciones</b>
+Imágenes horizontales (16:9) de buena calidad. Para videos, mejor en formato MP4 y livianos: ocupan espacio y se guardan en la TV para verse sin internet.</div>
+
+<h1>8. Ajuste de precios</h1>
+<p>Para subir o bajar muchos precios a la vez: <b>Ajuste de precios</b>. Siempre hay <b>vista previa</b> antes de aplicar.</p>
+<ol class="steps">
+  <li><b>Qué cambio</b>: <i>Subir</i> o <i>Bajar</i>, un valor y si es <b>porcentaje</b> o <b>monto fijo</b>. Opcionalmente un <b>redondeo</b> a múltiplos de $1, 5, 10, 50, 100, 500 o 1000 (al más cercano, hacia arriba o hacia abajo).</li>
+  <li><b>A qué artículos</b>: todo el catálogo, solo algunas categorías (incluida "sin categoría") o artículos elegidos uno por uno.</li>
+  <li><b>Cuándo</b>: ahora o <b>programado</b> para una fecha y hora (hasta un año). El servidor lo aplica solo a esa hora, aunque no tengas el panel abierto.</li>
+</ol>
+<p>Ejemplos: "+8 % a la categoría Vacuno, redondeado hacia arriba a $100", "−10 % a todo el catálogo el sábado a las 8:00", "+$200 a 5 artículos elegidos".</p>
+<h3>Seguridad</h3>
+<ul>
+  <li>El porcentaje va de −90 % a +1000 %. Ningún precio baja de $0.</li>
+  <li>El <b>precio anterior (tachado)</b> no se modifica con el ajuste. Si el nuevo precio supera al anterior, deja de mostrarse tachado.</li>
+  <li>Un cambio programado se puede <b>cancelar</b> mientras no se haya aplicado (hasta 50 programados a la vez).</li>
+  <li>Es <b>atómico</b>: se aplican todos los precios o ninguno.</li>
+</ul>
+<h3>Historial y deshacer</h3>
+<p>Cada ajuste queda registrado con el detalle (artículo, precio antes y después). <b>Deshacer</b> restaura los precios anteriores, pero solo de los artículos que siguen con el precio que puso ese ajuste: si alguien editó uno después, no se pisa su trabajo (el resumen indica cuántos se restauraron y cuántos se omitieron). Un ajuste se puede deshacer una sola vez.</p>
+
+<h1>9. Ciclos y escenas</h1>
+<p>Un <b>ciclo</b> es una secuencia de <b>escenas</b> que rotan en la pantalla. Se arman en <b>Ciclos</b>.</p>
+<h2>Ciclos reutilizables</h2>
+<ul>
+  <li>Armás el ciclo una vez (por ejemplo "Ciclo carnicería") y lo asignás a <b>todas las pantallas que quieras</b>. Si lo cambiás, todas se actualizan.</li>
+  <li>La <b>Configuración rápida</b> de una pantalla (en <i>Pantallas</i>) crea un ciclo propio solo para esa TV, sin tocar los compartidos.</li>
+  <li>Podés <b>duplicar</b> un ciclo para hacer una variante y <b>eliminar</b> los que no uses (las pantallas que lo usaban muestran el fondo de espera).</li>
+</ul>
+<h2>Crear un ciclo</h2>
+<ol class="steps">
+  <li>En <i>Ciclos</i>, escribí un nombre y elegí con qué empezar: <b>Cartelera completa</b>, <b>Precios + ofertas</b>, <b>Solo precios</b>, <b>Precios + ofertas + promos</b> o <b>Vacío</b>.</li>
+  <li>Se abre el editor: ves la <b>línea de tiempo</b> con todas las escenas y la duración total del ciclo.</li>
+  <li>Agregá escenas con los botones de abajo ("Agregar escena").</li>
+  <li>Reordenalas con ▲▼, cambiá su duración, activalas o desactivalas, editá, duplicá o quitá.</li>
+  <li>Tocá <b>Guardar cambios</b>. Las TVs se actualizan solas.</li>
+</ol>
+<div class="note"><b>Estado en vivo</b>
+Junto a cada escena el editor te dice qué mostraría hoy ("Se muestra hoy · 14 artículos", "Hoy no hay ofertas: esta escena se omite"). Las escenas vacías no se muestran en la TV.</div>
+
+<h2>Tipos de escena</h2>
+<table>
+  <tr><th style="width:22%">Tipo</th><th>Qué muestra y cómo se configura</th></tr>
+  <tr><td><b>💲 Precios</b></td><td>Una lista de precios. Elegís la lista, el estilo (lista / lista con fotos / tarjetas), filtrar por categorías (útil para repartir una lista larga en varias escenas) y <b>promos al costado</b> (imágenes que rotan junto a la lista).</td></tr>
+  <tr><td><b>🔥 Ofertas</b></td><td>Los artículos en oferta, en diseño <b>destacada</b> (uno a la vez, a pantalla grande) o <b>grilla</b>. Ver capítulo 11.</td></tr>
+  <tr><td><b>🖼️ Imagen / video</b></td><td>Uno o varios archivos de la biblioteca a pantalla completa. Si elegís varios al crear, se genera una escena por cada uno. Los videos se repiten durante la duración de la escena.</td></tr>
+  <tr><td><b>📝 Anuncio</b></td><td>Un texto grande con subtítulo opcional y 6 colores (rojo, azul, verde, naranja, violeta, oscuro). Ideal para avisos: "Hoy 15 % pagando en efectivo".</td></tr>
+  <tr><td><b>📺 Cartelera completa</b></td><td>Cabecera, lista, fotos/video, ofertas y avisos en una sola pantalla. Ver capítulo 10.</td></tr>
+</table>
+<p>Cada escena tiene su <b>duración</b> (de 3 a 600 segundos) y se puede <b>desactivar</b> sin borrarla (por ejemplo, una escena de feriado).</p>
+
+<h1>10. La cartelera completa</h1>
+<p>Una escena que arma <b>toda la pantalla</b>, pensada para locales donde se quiere ver todo a la vez.</p>
+<figure><img src="cartelera-oscuro.png"><figcaption>Cartelera completa con el estilo oscuro (captura de la TV).</figcaption></figure>
+<table>
+  <tr><th style="width:30%">Zona</th><th>Qué muestra</th></tr>
+  <tr><td>Cabecera</td><td>Logo con la inicial, nombre del negocio (o el título que elijas), subtítulo y fecha y hora en vivo.</td></tr>
+  <tr><td>Lista de precios (izquierda)</td><td>Con categorías, etiquetas, precio anterior tachado y precios en oferta en verde. Si es larga se achica o se desplaza sola.</td></tr>
+  <tr><td>Fotos o video (arriba derecha)</td><td>Las imágenes o videos que elijas, que rotan solos.</td></tr>
+  <tr><td>Oferta destacada (abajo derecha)</td><td>Rota entre las ofertas con foto, precio anterior, precio nuevo y un círculo con el descuento.</td></tr>
+  <tr><td>Franja de avisos (abajo)</td><td>Mensajes que se desplazan, hasta 10.</td></tr>
+</table>
+<h2>Cómo configurarla</h2>
+<ol class="steps">
+  <li>En <i>Ciclos</i>, creá un ciclo con "Empezar con: Cartelera completa" (o agregá la escena a uno existente).</li>
+  <li>Editá la escena y elegí la <b>lista de precios</b> (y, si querés, solo algunas categorías).</li>
+  <li>Completá <b>título</b> (vacío = nombre del negocio) y <b>subtítulo</b>, y decidí si se muestra la <b>fecha y hora</b>.</li>
+  <li>Elegí el <b>estilo</b>: oscuro, vino, azul, verde o claro.</li>
+  <li>Marcá las <b>fotos o videos</b> de la derecha (si no elegís ninguno, el espacio queda para las ofertas).</li>
+  <li>Activá o no las <b>ofertas destacadas</b>: automáticas (con un máximo) o artículos elegidos y ordenados por vos.</li>
+  <li>Escribí los <b>avisos</b> de la franja inferior, uno por línea (vacío = sin franja).</li>
+</ol>
+<figure><img src="cartelera-claro.png"><figcaption>La misma cartelera con el estilo claro.</figcaption></figure>
+<div class="tip"><b>Se adapta sola</b>
+Si no hay fotos elegidas o hoy no hay ofertas, ese recuadro se oculta y el resto ocupa el espacio. Una cartelera completa se puede dejar sola en un ciclo (se queda fija) o combinar con otras escenas.</div>
+
+<h1>11. Ofertas</h1>
+<p>Una oferta es un artículo cuyo <b>precio anterior es mayor al precio actual</b> o que lleva la etiqueta <b>OFERTA</b> o <b>PROMO</b>. El descuento (<b>-NN %</b>) se calcula solo.</p>
+<h2>Cómo crear una oferta</h2>
+<ol class="steps">
+  <li>En <i>Catálogo de Artículos</i>, editá el artículo.</li>
+  <li>Cargá el <b>precio anterior</b> (el de antes) y poné el <b>precio</b> nuevo más bajo. O ponele la etiqueta OFERTA.</li>
+  <li>Listo: entra solo en las escenas de ofertas automáticas. Para terminar la oferta, sacá el precio anterior o la etiqueta.</li>
+</ol>
+<h2>Dos diseños</h2>
+<table>
+  <tr><th style="width:24%">Diseño</th><th>Descripción</th></tr>
+  <tr><td><b>Destacada</b></td><td>Una oferta a la vez a pantalla grande, con foto, precio anterior tachado, precio gigante y círculo de descuento. Cada oferta se muestra entre 4 y 12 segundos, repartiendo la duración de la escena.</td></tr>
+  <tr><td><b>Grilla</b></td><td>Varias ofertas juntas en tarjetas con el descuento.</td></tr>
+</table>
+<h2>Automáticas o elegidas</h2>
+<ul>
+  <li><b>Automáticas</b>: todas las ofertas vigentes, ordenadas por mayor descuento. Podés limitar el máximo y filtrar por categorías. Se actualizan solas cuando cambia el catálogo.</li>
+  <li><b>Elegir artículos</b>: vos marcás cuáles y en qué orden. Los artículos sin stock se omiten.</li>
+</ul>
+<div class="warn"><b>Ojo</b>
+Si hoy no hay ofertas, una escena de ofertas automática <b>se omite</b> en la TV (no muestra una pantalla vacía). El editor te avisa "Hoy no hay ofertas".</div>
+
+<h1>12. Pantallas: asignar y configurar</h1>
+<p>En <b>Pantallas</b> aparece una tarjeta por cada TV vinculada, con su estado, ubicación y versión del reproductor.</p>
+<h2>Asignar un ciclo</h2>
+<ul>
+  <li>En la tarjeta de la pantalla, elegí el <b>Ciclo de contenido</b>. Se guarda al instante y la TV lo recibe en segundos.</li>
+  <li>Verás un resumen (cantidad de escenas y duración total) y el enlace <b>Editar ciclo</b>, que te lleva directo al editor.</li>
+  <li>Podés quitar el ciclo: la TV muestra el fondo de espera.</li>
+</ul>
+<h2>Transición</h2>
+<p>Cómo cambia de una escena a otra (y entre las imágenes de un carrusel): <b>fundido</b>, <b>deslizar</b> o <b>acercamiento</b>.</p>
+<h2>Configuración rápida</h2>
+<p>El botón <b>Configuración rápida</b> sirve para casos simples: elegís una lista de precios, el estilo y las promos, y el sistema crea un ciclo propio para esa TV. No modifica los ciclos compartidos.</p>
+<h2>Eliminar una pantalla</h2>
+<p>Libera un lugar de tu plan. La TV vuelve a pedir código de vinculación. Si tenía un ciclo propio (configuración rápida), se borra junto con ella; los ciclos compartidos se mantienen.</p>
+
+<h1>13. Qué pasa sin internet y cómo se actualiza</h1>
+<h2>Sin conexión</h2>
+<ul>
+  <li>La TV guarda la <b>última configuración</b> y todos los medios (imágenes, videos y fotos de los artículos) en el dispositivo.</li>
+  <li>Si se corta internet, <b>sigue reproduciendo</b> el ciclo con lo último que recibió.</li>
+  <li>Cuando vuelve la conexión, se pone al día sola. No hay que hacer nada.</li>
+</ul>
+<h2>Cuándo se ven los cambios</h2>
+<table>
+  <tr><th style="width:36%">Cambio</th><th>Cuándo llega a la TV</th></tr>
+  <tr><td>Precios, fotos, stock, ofertas, ciclos</td><td>En pocos segundos.</td></tr>
+  <tr><td>Ajuste programado de precios</td><td>A la hora programada, aunque el panel esté cerrado.</td></tr>
+  <tr><td>Mejoras del reproductor (diseño, funciones nuevas)</td><td>Por aire (OTA), como máximo en 10 minutos. No hay que reinstalar el APK.</td></tr>
+</table>
+<div class="note"><b>Actualizaciones seguras</b>
+El reproductor verifica cada actualización antes de usarla. Si una versión nueva falla al arrancar dos veces seguidas, la TV vuelve sola a la versión anterior que funcionaba. En <i>Pantallas</i> ves qué versión tiene cada TV.</div>
+
+<h1>14. Ejemplo completo: una carnicería</h1>
+<p>Un recorrido real de punta a punta para "Carnicería Don Ramón", con una TV en el mostrador.</p>
+<ol class="steps">
+  <li><b>Catálogo</b>: importás un CSV con 14 cortes (asado, vacío, bife, pollo, cerdo, embutidos, almacén), con categoría, unidad "kg" y precio.</li>
+  <li><b>Fotos</b>: subís 8 fotos en <i>Medios</i> y las asignás a los cortes principales.</li>
+  <li><b>Lista</b>: creás "Precios del día" y agregás todo el catálogo "Del catálogo", con agrupar por categoría.</li>
+  <li><b>Ofertas</b>: al asado le cargás precio anterior $14.500 y precio $12.900; al pollo, $5.200 y $4.600.</li>
+  <li><b>Ciclo</b>: creás "Cartelera completa" con estilo oscuro, título "Carnicería", subtítulo "Don Ramón · desde 1998", las fotos a la derecha, ofertas automáticas y tres avisos ("Hoy 15 % pagando en efectivo", "Pedí tu corte a medida", "Cerramos el lunes por feriado").</li>
+  <li><b>Pantalla</b>: vinculás la TV como "Mostrador" y le asignás el ciclo.</li>
+  <li><b>Día a día</b>: el sábado subís el vacío con <i>Ajuste de precios</i> (+5 %, redondeado a $100), programado para las 8:00. Para el feriado agregás un anuncio al ciclo; lo desactivás el martes.</li>
+</ol>
+<div class="tip"><b>Variante con varias escenas</b>
+Si preferís rotar: una escena de <b>Precios</b> de "Vacuno" (30 s), otra de "Pollo y cerdo" (20 s), <b>Ofertas</b> destacadas (15 s), una <b>Imagen</b> del local (8 s) y un <b>Anuncio</b> (8 s). El editor muestra la duración total del ciclo.</div>
+<p>Para otros rubros es igual: solo cambian las categorías y las unidades (ferretería: "unidad", "metro"; verdulería: "kg", "atado"; panadería: "docena", "unidad").</p>
+
+<h1>15. Para el administrador</h1>
+<p>El administrador entra con su usuario y ve el menú <b>Negocios</b>. Es quien da de alta a cada cliente.</p>
+<h2>Crear un negocio</h2>
+<ol class="steps">
+  <li>En <b>Negocios → Nuevo negocio</b> completá: nombre del negocio, usuario, contraseña (mínimo 8 caracteres; el botón <b>Generar</b> crea una segura), <b>máximo de pantallas</b> y <b>almacenamiento (MB)</b>.</li>
+  <li>Crealo y pasale al cliente la dirección del panel, su usuario y su contraseña.</li>
+</ol>
+<p>Cada negocio tiene <b>un solo usuario</b> y ve únicamente sus propios datos.</p>
+<h2>Gestionar negocios</h2>
+<ul>
+  <li><b>Editar</b>: cambiar nombre, máximo de pantallas, espacio o poner una contraseña nueva.</li>
+  <li><b>Suspender / Reactivar</b>: un negocio suspendido no puede entrar al panel.</li>
+  <li><b>Eliminar</b>: borra el negocio y todos sus archivos. No se puede deshacer.</li>
+</ul>
+<h2>Seguridad y mantenimiento</h2>
+<ul>
+  <li>Cambiá la contraseña del administrador desde <b>Mi cuenta</b> y no la compartas.</li>
+  <li><b>Respaldos</b>: el servidor incluye un script de respaldo (base de datos + archivos). Conviene programarlo todos los días y copiar los respaldos a otro lugar, porque si el servidor se pierde, se pierden con él.</li>
+  <li><b>Actualizar el sistema</b>: se despliega desde el proyecto con un script que reconstruye el servidor y publica los archivos nuevos del reproductor. Las TVs lo reciben por aire.</li>
+  <li><b>Nueva versión del APK</b>: solo hace falta cuando cambia el cargador de la app (poco frecuente). Se publica en la carpeta de descargas y los demás cambios llegan por OTA.</li>
+</ul>
+<div class="warn"><b>Antes de cualquier cambio grande</b>
+Hacé un respaldo de la base de datos. Cada ajuste de precios, además, queda en el historial y se puede deshacer desde el panel.</div>
+
+<h1>16. Problemas frecuentes</h1>
+<table>
+  <tr><th style="width:34%">Síntoma</th><th>Qué revisar</th></tr>
+  <tr><td>La TV muestra un código y no avanza</td><td>Ingresá ese código en <i>Pantallas → Vincular Pantalla</i>. Si el límite de pantallas de tu plan está completo, borrá una o pedí ampliarlo.</td></tr>
+  <tr><td>La TV muestra "Esperando contenido…"</td><td>La pantalla no tiene ciclo asignado, o el ciclo no tiene escenas con contenido hoy. Asignale un ciclo en <i>Pantallas</i>.</td></tr>
+  <tr><td>Un cambio de precio no aparece</td><td>Verificá que la TV tenga internet. Si la lista usa un artículo <b>manual</b>, no se actualiza con el catálogo. Esperá unos segundos.</td></tr>
+  <tr><td>No aparecen las ofertas</td><td>El artículo necesita precio anterior mayor al precio, o la etiqueta OFERTA/PROMO, y estar disponible (con stock). Revisá el estado en vivo del editor del ciclo.</td></tr>
+  <tr><td>Un artículo sale como AGOTADO</td><td>Tiene el stock apagado en el catálogo. Volvé a marcarlo disponible.</td></tr>
+  <tr><td>Un artículo no tiene foto</td><td>Se muestra su inicial. Elegí la foto en <i>Catálogo de Artículos → Editar</i>.</td></tr>
+  <tr><td>La importación rechaza filas</td><td>El resumen indica la fila y el motivo (falta el nombre o el precio no es un número). Corregí y volvé a importar el archivo: con códigos internos no duplica.</td></tr>
+  <tr><td>No puedo subir más archivos</td><td>Se llenó tu espacio. Borrá medios que no uses (barra lateral: "Espacio").</td></tr>
+  <tr><td>Una lista larga se ve muy chica</td><td>Dividila: en el ciclo, usá varias escenas de Precios filtradas por categoría.</td></tr>
+  <tr><td>Un video no se ve en la TV</td><td>Probá con MP4 más liviano. Los videos viejos o muy pesados pueden no reproducirse en TVs antiguas.</td></tr>
+  <tr><td>Me equivoqué en un ajuste de precios</td><td><i>Ajuste de precios → Historial → Deshacer</i> (solo restaura los artículos que no se editaron después).</td></tr>
+  <tr><td>No puedo entrar al panel</td><td>Revisá usuario y contraseña. Si la olvidaste, pedile al administrador que te ponga una nueva.</td></tr>
+</table>
+
+<h1>17. Límites y datos útiles</h1>
+<table>
+  <tr><th style="width:55%">Concepto</th><th>Valor</th></tr>
+  <tr><td>Duración de una escena</td><td>3 a 600 segundos</td></tr>
+  <tr><td>Escenas por ciclo</td><td>hasta 30</td></tr>
+  <tr><td>Ciclos por negocio</td><td>hasta 100</td></tr>
+  <tr><td>Avisos de la franja de la cartelera completa</td><td>hasta 10</td></tr>
+  <tr><td>Ofertas en la cartelera completa</td><td>hasta 12 (por defecto 6)</td></tr>
+  <tr><td>Ofertas en escenas de ofertas</td><td>hasta 24 (por defecto 8)</td></tr>
+  <tr><td>Etiqueta de un artículo</td><td>hasta 24 caracteres</td></tr>
+  <tr><td>Archivo de importación CSV</td><td>hasta 5 MB</td></tr>
+  <tr><td>Ajustes de precio programados a la vez</td><td>hasta 50 (hasta un año de anticipación)</td></tr>
+  <tr><td>Porcentaje de ajuste de precios</td><td>de −90 % a +1000 %</td></tr>
+  <tr><td>Pantallas y espacio de archivos</td><td>Los fija el administrador para cada negocio</td></tr>
+  <tr><td>Contraseña</td><td>mínimo 8 caracteres</td></tr>
+</table>
+<h2>Direcciones</h2>
+<ul>
+  <li>Panel de gestión: <code>https://carteleriaq.soporteq.tech</code></li>
+  <li>Descarga de la app para TV: <code>https://carteleriaq.soporteq.tech/download/carteleriaq.apk</code></li>
+  <li>Reproductor en el navegador: <code>https://carteleriaq.soporteq.tech/player</code></li>
+</ul>
+<h2>Consejos finales</h2>
+<ul>
+  <li>Mantené el <b>catálogo ordenado</b> con códigos internos y categorías: es lo que hace todo lo demás fácil.</li>
+  <li>Usá <b>listas enlazadas</b> al catálogo, así un cambio de precio se hace una sola vez.</li>
+  <li>Armá <b>ciclos reutilizables</b> y asignalos a varias TVs en lugar de configurar cada una.</li>
+  <li>Usá el <b>ajuste programado</b> para los aumentos fuera de horario.</li>
+  <li>Revisá el <b>estado en vivo</b> del editor de ciclos antes de dar un ciclo por terminado.</li>
+</ul>
+
+</body>
+</html>

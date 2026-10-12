@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API_URL } from '../config';
 import { apiFetch } from '../api';
 
-type SceneType = 'prices' | 'offers' | 'media' | 'text';
+type SceneType = 'prices' | 'offers' | 'media' | 'text' | 'board';
 
 interface Scene {
   key: string;
@@ -28,7 +28,16 @@ const TYPE_INFO: Record<SceneType, { label: string; icon: string; color: string;
   prices: { label: 'Precios', icon: '💲', color: 'bg-blue-100 text-blue-800', bar: 'bg-blue-500' },
   offers: { label: 'Ofertas', icon: '🔥', color: 'bg-red-100 text-red-800', bar: 'bg-red-500' },
   media: { label: 'Imagen / video', icon: '🖼️', color: 'bg-purple-100 text-purple-800', bar: 'bg-purple-500' },
-  text: { label: 'Anuncio', icon: '📝', color: 'bg-green-100 text-green-800', bar: 'bg-green-500' }
+  text: { label: 'Anuncio', icon: '📝', color: 'bg-green-100 text-green-800', bar: 'bg-green-500' },
+  board: { label: 'Cartelera completa', icon: '📺', color: 'bg-amber-100 text-amber-800', bar: 'bg-amber-500' }
+};
+const typeInfo = (t: string) => TYPE_INFO[t as SceneType] ?? { label: 'Escena', icon: '❔', color: 'bg-gray-100 text-gray-700', bar: 'bg-gray-400' };
+const BOARD_THEMES: Record<string, { label: string; swatch: string }> = {
+  dark: { label: 'Oscuro', swatch: 'from-slate-900 to-red-700' },
+  wine: { label: 'Vino', swatch: 'from-red-950 to-red-600' },
+  blue: { label: 'Azul', swatch: 'from-slate-900 to-blue-600' },
+  green: { label: 'Verde', swatch: 'from-emerald-950 to-emerald-500' },
+  light: { label: 'Claro', swatch: 'from-stone-100 to-orange-200' }
 };
 const STYLE_LABEL: Record<string, string> = { list: 'Lista', 'photo-list': 'Lista con fotos', cards: 'Tarjetas con fotos' };
 const THEMES: Record<string, string> = {
@@ -46,6 +55,7 @@ const defaultScene = (type: SceneType, lists: ListLite[]): Scene => {
   const base = { key: newKey(), type, name: '', enabled: true, priceListId: null as string | null, mediaId: null as string | null };
   if (type === 'prices') return { ...base, duration: 20, priceListId: lists[0]?.id ?? null, config: { style: 'list', categories: [], sideMediaIds: [] } };
   if (type === 'offers') return { ...base, duration: 12, config: { source: 'auto', design: 'hero', categories: [], productIds: [], maxItems: 8, title: 'OFERTAS' } };
+  if (type === 'board') return { ...base, duration: 60, priceListId: lists[0]?.id ?? null, config: { title: '', subtitle: '', theme: 'dark', showClock: true, categories: [], mediaIds: [], showOffers: true, offersSource: 'auto', productIds: [], maxOffers: 6, ticker: [] } };
   if (type === 'media') return { ...base, duration: 10, config: {} };
   return { ...base, duration: 8, config: { title: '', subtitle: '', theme: 'red' } };
 };
@@ -178,6 +188,12 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
       const cats: string[] = s.config.categories ?? [];
       return [manual ? `Elegidas a mano (${(s.config.productIds ?? []).length})` : 'Automáticas', s.config.design === 'grid' ? 'Grilla' : 'Una por una (destacada)', !manual && cats.length ? `Solo ${cats.join(', ')}` : null].filter(Boolean).join(' · ');
     }
+    if (s.type === 'board') {
+      const list = lists.find((l) => l.id === s.priceListId);
+      const cats: string[] = s.config.categories ?? [];
+      const n = (s.config.mediaIds ?? []).length;
+      return [list?.name ?? '⚠ lista eliminada', cats.length ? `Solo ${cats.map((c) => c || 'sin categoría').join(', ')}` : null, n ? `${n} foto(s)/video(s)` : 'sin fotos', s.config.showOffers === false ? 'sin ofertas' : s.config.offersSource === 'manual' ? 'ofertas elegidas' : 'ofertas automáticas', (s.config.ticker ?? []).length ? 'con avisos' : null].filter(Boolean).join(' · ');
+    }
     if (s.type === 'media') {
       const m = media.find((x) => x.id === s.mediaId);
       return m ? `${m.type === 'video' ? 'Video' : 'Imagen'}: ${m.name}` : '⚠ archivo eliminado';
@@ -203,6 +219,7 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
             <div>
               <label className="block text-sm text-gray-600 mb-1">Empezar con</label>
               <select value={template} onChange={(e) => setTemplate(e.target.value)} className="border p-2 rounded bg-white">
+                <option value="board">Cartelera completa (lista + video + ofertas)</option>
                 <option value="prices-offers">Precios + ofertas</option>
                 <option value="prices">Solo precios</option>
                 <option value="full">Precios + ofertas + promos</option>
@@ -269,9 +286,9 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
           <div className="mt-4">
             <div className="flex h-9 rounded overflow-hidden border">
               {scenes.map((s, i) => (
-                <div key={s.key} style={{ flex: s.duration }} title={`${TYPE_INFO[s.type].label} · ${s.duration} s`}
-                  className={`${TYPE_INFO[s.type].bar} ${s.enabled ? '' : 'opacity-30'} text-white text-xs flex items-center justify-center border-r border-white/60 last:border-0 overflow-hidden`}>
-                  <span className="truncate px-1">{i + 1} {TYPE_INFO[s.type].icon}</span>
+                <div key={s.key} style={{ flex: s.duration }} title={`${typeInfo(s.type).label} · ${s.duration} s`}
+                  className={`${typeInfo(s.type).bar} ${s.enabled ? '' : 'opacity-30'} text-white text-xs flex items-center justify-center border-r border-white/60 last:border-0 overflow-hidden`}>
+                  <span className="truncate px-1">{i + 1} {typeInfo(s.type).icon}</span>
                 </div>
               ))}
             </div>
@@ -290,7 +307,7 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
                 <button onClick={() => move(i, 1)} disabled={i === scenes.length - 1} className="text-gray-400 hover:text-gray-800 disabled:opacity-20 leading-none" title="Bajar">▼</button>
               </div>
               <span className="w-6 text-center font-bold text-gray-400">{i + 1}</span>
-              <span className={`text-xs font-semibold px-2 py-1 rounded whitespace-nowrap ${TYPE_INFO[s.type].color}`}>{TYPE_INFO[s.type].icon} {TYPE_INFO[s.type].label}</span>
+              <span className={`text-xs font-semibold px-2 py-1 rounded whitespace-nowrap ${typeInfo(s.type).color}`}>{typeInfo(s.type).icon} {typeInfo(s.type).label}</span>
               <div className="flex-1 min-w-[12rem]">
                 {s.name && <div className="font-medium text-gray-800">{s.name}</div>}
                 <div className="text-sm text-gray-600">{summary(s)}</div>
@@ -360,10 +377,10 @@ const SceneModal = ({ scene, isNew, lists, media, products, onClose, onSave }: M
 
   const list = lists.find((l) => l.id === s.priceListId);
   const categories = useMemo(() => {
-    const src = s.type === 'prices' ? (list?.items.map((i) => i.category) ?? []) : products.map((p) => p.category);
+    const src = s.type === 'prices' || s.type === 'board' ? (list?.items.map((i) => i.category) ?? []) : products.map((p) => p.category);
     return [...new Set(src.filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b));
   }, [s.type, list, products]);
-  const hasUncategorized = s.type === 'prices' ? !!list?.items.some((i) => !i.category) : products.some((p) => !p.category);
+  const hasUncategorized = s.type === 'prices' || s.type === 'board' ? !!list?.items.some((i) => !i.category) : products.some((p) => !p.category);
 
   const offerProducts = useMemo(() => products.filter(isOfferProduct), [products]);
   const autoOffers = offerProducts.filter((p) => !(cfg.categories ?? []).length || (cfg.categories as string[]).includes(p.category ?? ''));
@@ -374,7 +391,8 @@ const SceneModal = ({ scene, isNew, lists, media, products, onClose, onSave }: M
   const submit = () => {
     setError('');
     if (!Number.isFinite(s.duration) || s.duration < 3) { setError('La duración mínima es de 3 segundos.'); return; }
-    if (s.type === 'prices' && !s.priceListId) { setError('Elegí una lista de precios.'); return; }
+    if ((s.type === 'prices' || s.type === 'board') && !s.priceListId) { setError('Elegí una lista de precios.'); return; }
+    if (s.type === 'board' && cfg.showOffers !== false && cfg.offersSource === 'manual' && !(cfg.productIds ?? []).length) { setError('Elegí al menos un artículo para las ofertas.'); return; }
     if (s.type === 'offers' && cfg.source === 'manual' && !(cfg.productIds ?? []).length) { setError('Elegí al menos un artículo.'); return; }
     if (s.type === 'text' && !String(cfg.title ?? '').trim()) { setError('Escribí el texto del anuncio.'); return; }
     if (s.type === 'media') {
@@ -392,7 +410,7 @@ const SceneModal = ({ scene, isNew, lists, media, products, onClose, onSave }: M
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="p-5 border-b flex items-center gap-3">
-          <span className={`text-sm font-semibold px-3 py-1 rounded ${TYPE_INFO[s.type].color}`}>{TYPE_INFO[s.type].icon} {TYPE_INFO[s.type].label}</span>
+          <span className={`text-sm font-semibold px-3 py-1 rounded ${typeInfo(s.type).color}`}>{typeInfo(s.type).icon} {typeInfo(s.type).label}</span>
           <h4 className="font-bold text-gray-800 text-lg">{isNew ? 'Nueva escena' : 'Editar escena'}</h4>
         </div>
 
@@ -531,6 +549,130 @@ const SceneModal = ({ scene, isNew, lists, media, products, onClose, onSave }: M
                   <p className="text-xs text-gray-500 mt-1">El número indica el orden en que se muestran. Los artículos sin stock se omiten.</p>
                 </div>
               )}
+            </>
+          )}
+
+          {s.type === 'board' && (
+            <>
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
+                Una sola pantalla con todo junto: <strong>cabecera con reloj</strong>, <strong>lista de precios</strong>, <strong>fotos o video</strong>, <strong>ofertas que rotan</strong> y una <strong>franja de avisos</strong>.
+              </div>
+
+              <div>
+                <label className="block text-gray-600 mb-1">Lista de precios</label>
+                <select value={s.priceListId ?? ''} onChange={(e) => { setS({ ...s, priceListId: e.target.value || null }); setCfg({ categories: [] }); }} className="border p-2 rounded w-full bg-white">
+                  <option value="">— Elegí una lista —</option>
+                  {lists.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.items.length})</option>)}
+                </select>
+                {lists.length === 0 && <p className="text-orange-600 mt-1">Todavía no tenés listas. Creálas en "Listas de Pantalla".</p>}
+              </div>
+              {(categories.length > 0 || hasUncategorized) && (
+                <div>
+                  <label className="block text-gray-600 mb-1">Mostrar solo estas categorías <span className="text-gray-400">(ninguna marcada = todas)</span></label>
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map((c) => <button type="button" key={c} onClick={() => setCfg({ categories: toggle(cfg.categories ?? [], c) })} className={chip((cfg.categories ?? []).includes(c))}>{c}</button>)}
+                    {hasUncategorized && <button type="button" onClick={() => setCfg({ categories: toggle(cfg.categories ?? [], '') })} className={chip((cfg.categories ?? []).includes(''))}>Sin categoría</button>}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-600 mb-1">Título de la cabecera</label>
+                  <input value={cfg.title ?? ''} onChange={(e) => setCfg({ title: e.target.value })} maxLength={40} placeholder="Vacío = nombre del negocio" className="border p-2 rounded w-full" />
+                </div>
+                <div>
+                  <label className="block text-gray-600 mb-1">Subtítulo (opcional)</label>
+                  <input value={cfg.subtitle ?? ''} onChange={(e) => setCfg({ subtitle: e.target.value })} maxLength={60} placeholder="Ej: Desde 1998" className="border p-2 rounded w-full" />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={cfg.showClock !== false} onChange={(e) => setCfg({ showClock: e.target.checked })} /> Mostrar fecha y hora en la cabecera
+              </label>
+
+              <div>
+                <label className="block text-gray-600 mb-2">Estilo</label>
+                <div className="flex flex-wrap gap-3">
+                  {Object.entries(BOARD_THEMES).map(([k, t]) => (
+                    <button type="button" key={k} onClick={() => setCfg({ theme: k })} className="text-center">
+                      <div className={`w-16 h-12 rounded-lg bg-gradient-to-br ${t.swatch} border-4 ${(cfg.theme ?? 'dark') === k ? 'border-gray-800' : 'border-transparent'}`} />
+                      <div className="text-xs text-gray-600 mt-1">{t.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-600 mb-1">Fotos o videos <span className="text-gray-400">(arriba a la derecha, rotan solos; sin elegir, el espacio queda para las ofertas)</span></label>
+                <div className="grid grid-cols-4 md:grid-cols-6 gap-2 max-h-40 overflow-y-auto border rounded p-2">
+                  {media.length === 0 && <p className="col-span-full text-gray-500">No hay imágenes ni videos cargados.</p>}
+                  {media.map((m) => {
+                    const on = (cfg.mediaIds ?? []).includes(m.id);
+                    return (
+                      <button type="button" key={m.id} onClick={() => setCfg({ mediaIds: toggle(cfg.mediaIds ?? [], m.id) })} className={`relative border-2 rounded overflow-hidden ${on ? 'border-blue-600' : 'border-transparent hover:border-gray-300'}`}>
+                        <Thumb m={m} className="w-full h-16" />
+                        {on && <span className="absolute top-1 right-1 bg-blue-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer font-medium text-gray-800">
+                  <input type="checkbox" checked={cfg.showOffers !== false} onChange={(e) => setCfg({ showOffers: e.target.checked })} /> Mostrar ofertas destacadas (abajo a la derecha)
+                </label>
+                {cfg.showOffers !== false && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button type="button" onClick={() => setCfg({ offersSource: 'auto' })} className={`text-left border-2 rounded-lg p-3 ${cfg.offersSource !== 'manual' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'}`}>
+                        <div className="font-semibold">Automáticas</div><div className="text-xs text-gray-500">Artículos con precio anterior mayor o etiqueta OFERTA.</div>
+                      </button>
+                      <button type="button" onClick={() => setCfg({ offersSource: 'manual' })} className={`text-left border-2 rounded-lg p-3 ${cfg.offersSource === 'manual' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'}`}>
+                        <div className="font-semibold">Elegir artículos</div><div className="text-xs text-gray-500">Vos decidís cuáles y en qué orden.</div>
+                      </button>
+                    </div>
+                    {cfg.offersSource !== 'manual' ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <label className="text-gray-600">Máximo de ofertas</label>
+                          <select value={cfg.maxOffers ?? 6} onChange={(e) => setCfg({ maxOffers: Number(e.target.value) })} className="border p-1 rounded bg-white">
+                            {[3, 4, 6, 8, 12].map((n) => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </div>
+                        <div className={`p-3 rounded border ${offerProducts.length ? 'bg-green-50 border-green-200 text-green-800' : 'bg-orange-50 border-orange-200 text-orange-800'}`}>
+                          {offerProducts.length
+                            ? <>Hoy hay <strong>{offerProducts.length}</strong> oferta(s): {offerProducts.slice(0, 6).map((p) => p.name).join(', ')}{offerProducts.length > 6 ? '…' : ''}</>
+                            : <>Hoy no hay ofertas: el recuadro queda oculto hasta que haya. Cargá un <strong>precio anterior</strong> o la etiqueta <strong>OFERTA</strong> en el catálogo.</>}
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar artículo…" className="border p-2 rounded w-full mb-2" />
+                        <div className="max-h-48 overflow-y-auto border rounded">
+                          {filteredProducts.map((p) => {
+                            const order = (cfg.productIds ?? []).indexOf(p.id);
+                            return (
+                              <label key={p.id} className="flex items-center gap-3 px-3 py-2 border-b last:border-0 cursor-pointer hover:bg-gray-50">
+                                <input type="checkbox" checked={order >= 0} onChange={() => setCfg({ productIds: toggle(cfg.productIds ?? [], p.id) })} />
+                                {order >= 0 && <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">{order + 1}</span>}
+                                <span className="flex-1 truncate">{p.name}</span>
+                                <span className="text-gray-500">${new Intl.NumberFormat('es-AR').format(p.price)}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-gray-600 mb-1">Avisos en la franja inferior <span className="text-gray-400">(uno por línea, hasta 10; vacío = sin franja)</span></label>
+                <textarea rows={3} value={(cfg.ticker ?? []).join('\n')} onChange={(e) => setCfg({ ticker: e.target.value.split('\n').slice(0, 10) })}
+                  placeholder={'Hoy 15% de descuento pagando en efectivo\nPedí tu corte a medida'} className="border p-2 rounded w-full" />
+              </div>
             </>
           )}
 

@@ -227,6 +227,59 @@ const upload = (token, name) => {
   const afterMedia = await sync(tv1);
   check('borrar un archivo quita solo las escenas que lo usan', afterMedia.scenes.every((s) => !s.media || s.media.url !== img1.url) && afterMedia.scenes.length >= 1);
 
+  console.log('Cartelera completa (board)');
+  await call('PUT', `/api/products/${vacio.id}`, { token: A.token, body: { internalCode: 'V2', name: 'Vacío', price: 15000, oldPrice: 16000, category: 'Vacuno', unit: 'kg', badge: 'OFERTA' } });
+  const bimg = (await upload(A.token, 'board1.png')).data;
+  const btpl = await call('POST', '/api/cycles', { token: A.token, body: { name: 'Cartelera', template: 'board' } });
+  const tplGot = (await call('GET', `/api/cycles/${btpl.data.id}`, { token: A.token })).data;
+  check('la plantilla "board" crea una escena de cartelera completa', btpl.status === 201 && tplGot.scenes.length === 1 && tplGot.scenes[0].type === 'board' && tplGot.scenes[0].priceListId === list.id);
+  check('la plantilla ya incluye las imágenes del negocio y las ofertas automáticas', tplGot.scenes[0].config.offersSource === 'auto' && tplGot.scenes[0].config.mediaIds.includes(bimg.id) && tplGot.scenes[0].refs.boardMedia.length >= 1);
+
+  const boardScene = (cfg = {}, extra = {}) => ({ type: 'board', duration: 60, priceListId: list.id, config: { title: 'Don Ramón', subtitle: 'Desde 1998', theme: 'wine', showClock: true, mediaIds: [bimg.id], showOffers: true, offersSource: 'auto', maxOffers: 3, ticker: ['Hoy 15% en efectivo', '  ', 'Cerramos el lunes'], ...cfg }, ...extra });
+  const saveBoard = (scene, id = btpl.data.id) => call('PUT', `/api/cycles/${id}/scenes`, { token: A.token, body: { scenes: [scene] } });
+  check('guarda una cartelera completa', (await saveBoard(boardScene())).status === 200);
+  await call('POST', `/api/screens/${tv1.id}/cycle`, { token: A.token, body: { playlistId: btpl.data.id } });
+  const bq = (await sync(tv1)).scenes[0];
+  check('la TV recibe título, subtítulo, tema y reloj', bq.type === 'board' && bq.title === 'Don Ramón' && bq.subtitle === 'Desde 1998' && bq.theme === 'wine' && bq.showClock === true);
+  check('la lista de precios viene filtrada y completa', bq.priceList.items.length === 4 && bq.listTitle === list.name);
+  check('trae las fotos/video de la derecha', bq.media.length === 1 && bq.media[0].id === bimg.id && bq.media[0].type === 'image');
+  check('trae las ofertas automáticas con el descuento calculado', bq.offers.length === 2 && bq.offers[0].name === 'Asado de tira' && bq.offers[0].discountPercent === 20);
+  check('limpia los avisos vacíos', bq.ticker.length === 2 && bq.ticker[1] === 'Cerramos el lunes');
+  check('ofertas limitadas al máximo configurado', (await saveBoard(boardScene({ maxOffers: 1 }))).status === 200 && (await sync(tv1)).scenes[0].offers.length === 1);
+  await saveBoard(boardScene({ showOffers: false }));
+  check('sin ofertas activadas no manda ofertas', (await sync(tv1)).scenes[0].offers.length === 0);
+  await saveBoard(boardScene({ offersSource: 'manual', productIds: [pollo.id, asado.id] }));
+  const boardManual = (await sync(tv1)).scenes[0].offers;
+  check('ofertas elegidas a mano respetan el orden', boardManual.length === 2 && boardManual[0].name === 'Pollo entero' && boardManual[1].name === 'Asado de tira');
+  await saveBoard(boardScene({ categories: ['Vacuno'] }));
+  check('filtra la lista por categoría', (await sync(tv1)).scenes[0].priceList.items.every((i) => i.category === 'Vacuno'));
+  check('sin título usa el nombre del negocio', (await saveBoard(boardScene({ title: '' }))).status === 200 && (await sync(tv1)).scenes[0].title === 'Ciclos a');
+  check('el tema inválido vuelve a "dark"', (await saveBoard(boardScene({ theme: 'rosa' }))).status === 200 && (await sync(tv1)).scenes[0].theme === 'dark');
+
+  const boardNoList = await saveBoard({ ...boardScene(), priceListId: null });
+  check('rechaza una cartelera sin lista de precios', boardNoList.status === 400);
+  check('rechaza ofertas manuales sin artículos', (await saveBoard(boardScene({ offersSource: 'manual', productIds: [] }))).status === 400);
+  check('rechaza fotos de otro negocio', (await saveBoard(boardScene({ mediaIds: [(await upload(B.token, 'ajena.png')).data.id] }))).status === 400);
+  check('rechaza artículos de otro negocio', (await saveBoard(boardScene({ offersSource: 'manual', productIds: [(await mkProduct(B.token, { internalCode: 'X1', name: 'Ajeno', price: 1 })).id] }))).status === 400);
+  const boardPrev = (await call('GET', `/api/cycles/${btpl.data.id}/preview`, { token: A.token })).data;
+  check('el estado en vivo marca la cartelera como visible', boardPrev.scenes[0].shown === true && boardPrev.scenes[0].count >= 1);
+
+  console.log('Borrar una pantalla');
+  const tv3 = await mkScreen('TV 3');
+  await call('POST', `/api/screens/${tv3.id}/assign`, { token: A.token, body: { priceListId: list.id, mediaIds: [], layout: 'full-menu' } });
+  const privBefore = (await call('GET', '/api/cycles', { token: A.token })).data.filter((c) => c.private).length;
+  const shared = await call('POST', `/api/screens/${tv3.id}/cycle`, { token: A.token, body: { playlistId: btpl.data.id } });
+  check('una pantalla puede pasar de su ciclo propio a uno compartido', shared.status === 200);
+  await call('DELETE', `/api/screens/${tv3.id}`, { token: A.token });
+  const cyclesAfter = (await call('GET', '/api/cycles', { token: A.token })).data;
+  check('borrar la pantalla no borra el ciclo compartido que usaba', cyclesAfter.some((c) => c.id === btpl.data.id));
+  const tv4 = await mkScreen('TV 4');
+  await call('POST', `/api/screens/${tv4.id}/assign`, { token: A.token, body: { priceListId: list.id, mediaIds: [], layout: 'full-menu' } });
+  const privMid = (await call('GET', '/api/cycles', { token: A.token })).data.filter((c) => c.private).length;
+  await call('DELETE', `/api/screens/${tv4.id}`, { token: A.token });
+  const privEnd = (await call('GET', '/api/cycles', { token: A.token })).data.filter((c) => c.private).length;
+  check('borrar la pantalla borra su ciclo propio y no deja ciclos huérfanos', privMid === privEnd + 1 && privEnd <= privBefore);
+
   for (const b of [A, B]) await call('DELETE', `/api/admin/businesses/${b.id}`, { token: admin.token });
   console.log(`\n${passed} correctas, ${failed} fallidas`);
   process.exit(failed ? 1 : 0);

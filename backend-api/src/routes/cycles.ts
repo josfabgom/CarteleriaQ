@@ -7,7 +7,7 @@ const router = Router();
 router.use(requireBusiness);
 
 const MAX_CYCLES = 100;
-const TEMPLATES: Template[] = ['prices', 'prices-offers', 'full'];
+const TEMPLATES: Template[] = ['prices', 'prices-offers', 'full', 'board'];
 
 const totalSeconds = (items: { duration: number; enabled: boolean }[]) =>
   items.filter((i) => i.enabled).reduce((sum, i) => sum + i.duration, 0);
@@ -65,7 +65,7 @@ router.get('/:id', async (req, res) => {
   });
   if (!cycle) return res.status(404).json({ error: 'Ciclo no encontrado' });
 
-  const sideIds = [...new Set(cycle.items.flatMap((i) => ((i.config as any)?.sideMediaIds as string[]) ?? []))];
+  const sideIds = [...new Set(cycle.items.flatMap((i) => [...(((i.config as any)?.sideMediaIds as string[]) ?? []), ...(((i.config as any)?.mediaIds as string[]) ?? [])]))];
   const sideMedia = sideIds.length ? await prisma.media.findMany({ where: { id: { in: sideIds }, businessId } }) : [];
 
   res.json({
@@ -87,6 +87,10 @@ router.get('/:id', async (req, res) => {
         priceListName: i.priceList?.name ?? null,
         media: i.media ? { id: i.media.id, url: i.media.url, type: i.media.type, name: i.media.name } : null,
         sideMedia: (((i.config as any)?.sideMediaIds as string[]) ?? [])
+          .map((id) => sideMedia.find((m) => m.id === id))
+          .filter((m): m is NonNullable<typeof m> => !!m)
+          .map((m) => ({ id: m.id, url: m.url, type: m.type, name: m.name })),
+        boardMedia: (((i.config as any)?.mediaIds as string[]) ?? [])
           .map((id) => sideMedia.find((m) => m.id === id))
           .filter((m): m is NonNullable<typeof m> => !!m)
           .map((m) => ({ id: m.id, url: m.url, type: m.type, name: m.name }))

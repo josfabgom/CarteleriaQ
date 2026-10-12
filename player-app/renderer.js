@@ -338,12 +338,21 @@ if (CACHE_ENABLED && navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().catch(() => {});
 }
 
+// Todo lo que las escenas necesitan mostrar sin conexión: imágenes/videos, promos y fotos de los artículos
 const collectMediaUrls = (config) => {
   const urls = new Set();
+  const add = (u) => { if (u) urls.add(u); };
   for (const entry of config.playlist?.items || []) {
-    if (entry.media) urls.add(entry.media.url);
-    // fotos de los artículos del menú
-    for (const item of entry.priceList?.items || []) if (item.imageUrl) urls.add(item.imageUrl);
+    if (entry.media) add(entry.media.url);
+    for (const item of entry.priceList?.items || []) add(item.imageUrl);
+  }
+  for (const scene of config.scenes || []) {
+    if (scene.media && scene.media.url) add(scene.media.url);
+    for (const m of Array.isArray(scene.media) ? scene.media : []) add(m.url);
+    for (const m of scene.side || []) add(m.url);
+    for (const item of scene.priceList?.items || []) add(item.imageUrl);
+    for (const item of scene.items || []) add(item.imageUrl);
+    for (const item of scene.offers || []) add(item.imageUrl);
   }
   return [...urls];
 };
@@ -648,6 +657,7 @@ let currentSceneId = null;
 let sceneToken = 0;
 
 function stopSceneContent() {
+  clearBoardTimers();
   if (heroTimer) { clearInterval(heroTimer); heroTimer = null; }
   if (carouselInterval) { clearInterval(carouselInterval); carouselInterval = null; }
 }
@@ -745,16 +755,18 @@ function renderScene(scene, screenData) {
     renderCarousel([scene.media], scene.duration * 1000, transition);
   } else if (scene.type === 'text') {
     renderTextScene(scene, transition);
+  } else if (scene.type === 'board') {
+    renderBoard(scene, transition);
   } else {
     renderIdle(screenData);
   }
 }
 
 // Carrusel de imágenes/videos en el panel de medios (con cambio automático si hay más de uno)
-function renderCarousel(mediaList, durationMs, transition) {
-  mediaContainer.innerHTML = '';
+function renderCarousel(mediaList, durationMs, transition, box = mediaContainer) {
+  box.innerHTML = '';
   if (mediaList.length === 0) {
-    mediaContainer.innerHTML = '<div class="media-element active" style="background:linear-gradient(135deg,#1e3a8a,#0f172a)"></div>';
+    box.innerHTML = '<div class="media-element active" style="background:linear-gradient(135deg,#1e3a8a,#0f172a)"></div>';
     return;
   }
 
@@ -776,13 +788,13 @@ function renderCarousel(mediaList, durationMs, transition) {
     }
     el.className = 'media-element';
     if (index === 0) el.classList.add('active');
-    mediaContainer.appendChild(el);
+    box.appendChild(el);
     attachMedia(el, media.url);
   });
 
   if (mediaList.length > 1) {
     let currentIndex = 0;
-    const elements = mediaContainer.querySelectorAll('.media-element');
+    const elements = box.querySelectorAll('.media-element');
 
     // En "zoom" la animación dura lo mismo que cada imagen para que el acercamiento sea continuo
     if (transition === 'zoom') {
@@ -803,7 +815,7 @@ function renderCarousel(mediaList, durationMs, transition) {
     }, durationMs);
   } else {
     // Un solo video: que se reproduzca
-    const firstEl = mediaContainer.querySelector('.media-element.active');
+    const firstEl = box.querySelector('.media-element.active');
     if (firstEl && firstEl.tagName === 'VIDEO') firstEl.play().catch((e) => console.log(e));
   }
 }
@@ -935,6 +947,183 @@ function renderTextScene(scene, transition) {
     box.appendChild(sub);
   }
   priceListContainer.appendChild(box);
+}
+
+// ---- Cartelera completa: cabecera con reloj, lista de precios, fotos/video, ofertas rotando y franja de avisos ----
+let boardTimers = [];
+let boardScroll = null; // desplazamiento automático de la lista
+function clearBoardTimers() {
+  boardTimers.forEach((t) => clearInterval(t));
+  boardTimers = [];
+  if (boardScroll) { clearInterval(boardScroll); boardScroll = null; }
+}
+
+const DAYS_ES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MONTHS_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+const h = (tag, className, text) => {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  if (text != null) e.textContent = text;
+  return e;
+};
+
+function renderBoard(scene, transition) {
+  document.body.className = 'layout-full-menu scene-board transition-' + transition;
+  document.querySelector('.header-precios').style.display = 'none';
+  mediaContainer.innerHTML = '';
+  priceListContainer.className = 'price-list board-host';
+
+  const offers = scene.offers || [];
+  const media = scene.media || [];
+  const board = h('div', 'board board-theme-' + (scene.theme || 'dark'));
+  board.classList.add(media.length ? 'has-media' : 'no-media', offers.length ? 'has-offers' : 'no-offers');
+
+  // Cabecera
+  const head = h('div', 'b-head');
+  const brand = h('div', 'b-brand');
+  brand.appendChild(h('div', 'b-logo', (scene.title || '?').trim().charAt(0).toUpperCase()));
+  const names = h('div', 'b-names');
+  names.appendChild(h('div', 'b-title', scene.title || ''));
+  if (scene.subtitle) names.appendChild(h('div', 'b-subtitle', scene.subtitle));
+  brand.appendChild(names);
+  head.appendChild(brand);
+  if (scene.showClock !== false) {
+    const clock = h('div', 'b-clock');
+    const time = h('b', null, '');
+    const date = h('span', null, '');
+    clock.append(time, date);
+    head.appendChild(clock);
+    const tick = () => {
+      const d = new Date();
+      time.textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      date.textContent = DAYS_ES[d.getDay()] + ' ' + d.getDate() + ' de ' + MONTHS_ES[d.getMonth()];
+    };
+    tick();
+    boardTimers.push(setInterval(tick, 15000));
+  }
+  board.appendChild(head);
+
+  // Cuerpo: lista de precios a la izquierda; fotos/video y ofertas a la derecha
+  const main = h('div', 'b-main');
+  const listCard = h('div', 'b-card b-list');
+  listCard.appendChild(h('div', 'b-list-title', scene.listTitle || (scene.priceList && scene.priceList.name) || 'Precios'));
+  const rows = h('div', 'b-rows');
+  listCard.appendChild(rows);
+  main.appendChild(listCard);
+
+  if (media.length || offers.length) {
+    const right = h('div', 'b-right');
+    if (media.length) {
+      const box = h('div', 'b-card board-media');
+      right.appendChild(box);
+      board.mediaBox = box;
+    }
+    if (offers.length) {
+      const card = h('div', 'b-card b-offer');
+      right.appendChild(card);
+      board.offerCard = card;
+    }
+    main.appendChild(right);
+  }
+  board.appendChild(main);
+
+  // Franja de avisos
+  const ticker = (scene.ticker || []).filter(Boolean);
+  if (ticker.length) {
+    const foot = h('div', 'b-foot');
+    foot.appendChild(h('div', 'b-foot-label', 'AVISO'));
+    const track = h('div', 'b-ticker');
+    const text = ticker.join('   ·   ');
+    const span = h('span', null, text);
+    track.appendChild(span);
+    foot.appendChild(track);
+    board.appendChild(foot);
+    span.style.animationDuration = Math.max(20, Math.round(text.length * 0.22)) + 's';
+  }
+
+  priceListContainer.appendChild(board);
+
+  fillBoardList(board, rows, scene.priceList);
+  if (board.mediaBox) renderCarousel(media, (screenDataMediaSeconds() * 1000), 'fade', board.mediaBox);
+  if (board.offerCard) startBoardOffers(board.offerCard, offers);
+}
+
+const screenDataMediaSeconds = () => (currentSyncData && currentSyncData.mediaDuration) || 10;
+
+function fillBoardList(board, rows, priceList) {
+  const items = priceList.items || [];
+  for (const group of groupItems(items, priceList.groupByCategory)) {
+    if (group.title) rows.appendChild(h('div', 'b-group', group.title));
+    for (const item of group.items) {
+      const row = h('div', 'b-row' + (item.available === false ? ' unavailable' : ''));
+      row.appendChild(h('span', 'b-dot'));
+      row.appendChild(h('span', 'b-name', itemName(item)));
+      const badge = itemBadge(item);
+      if (badge) row.appendChild(h('span', 'b-tag', badge));
+      const unit = (item.unit || '').trim();
+      if (unit && !['unidad', 'u', 'un'].includes(unit.toLowerCase())) row.appendChild(h('span', 'b-unit', '/' + unit));
+      const old = Number(item.oldPrice);
+      if (Number.isFinite(old) && old > Number(item.price)) row.appendChild(h('span', 'b-old', formatPrice(old)));
+      row.appendChild(h('span', 'b-price' + (Number.isFinite(old) && old > Number(item.price) ? ' promo' : ''), formatPrice(item.price)));
+      rows.appendChild(row);
+    }
+  }
+
+  // Que la lista entre: primero se achica la letra y, si aun así no cabe, se desplaza sola
+  const fit = () => {
+    if (boardScroll) { clearInterval(boardScroll); boardScroll = null; }
+    rows.scrollTop = 0;
+    let scale = 1;
+    board.style.setProperty('--bs', scale);
+    while (rows.scrollHeight > rows.clientHeight + 1 && scale > 0.5) {
+      scale = Math.round((scale - 0.05) * 100) / 100;
+      board.style.setProperty('--bs', scale);
+    }
+    if (rows.scrollHeight > rows.clientHeight + 1) {
+      let pause = 0;
+      let dir = 1;
+      boardScroll = setInterval(() => {
+        if (pause > 0) { pause--; return; }
+        rows.scrollTop += dir;
+        const atEnd = rows.scrollTop + rows.clientHeight >= rows.scrollHeight - 1;
+        if (dir === 1 && atEnd) { pause = 100; dir = -1; }
+        else if (dir === -1 && rows.scrollTop <= 0) { pause = 100; dir = 1; }
+      }, 30);
+    }
+  };
+  fit();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (rows.isConnected) fit(); });
+}
+
+function startBoardOffers(card, offers) {
+  let index = 0;
+  const draw = () => {
+    const item = offers[index];
+    card.innerHTML = '';
+    const pending = [];
+    const photo = h('div', 'b-offer-photo');
+    photo.appendChild(makePhoto(item, 'b-offer-img', pending));
+    const body = h('div', 'b-offer-body');
+    body.appendChild(h('span', 'b-ribbon', 'OFERTA'));
+    body.appendChild(h('div', 'b-offer-name', itemName(item)));
+    const old = Number(item.oldPrice);
+    if (Number.isFinite(old) && old > Number(item.price)) body.appendChild(h('div', 'b-offer-old', 'Antes ' + formatPrice(old)));
+    const price = h('div', 'b-offer-price', formatPrice(item.price));
+    const unit = (item.unit || '').trim();
+    if (unit && !['unidad', 'u', 'un'].includes(unit.toLowerCase())) price.appendChild(h('small', null, '/' + unit));
+    body.appendChild(price);
+    card.append(photo, body);
+    if (item.discountPercent) {
+      const disc = h('div', 'b-offer-off', '-' + item.discountPercent + '%');
+      disc.appendChild(h('small', null, 'HOY'));
+      card.appendChild(disc);
+    }
+    for (const [img, url] of pending) attachMedia(img, url);
+    index = (index + 1) % offers.length;
+  };
+  draw();
+  if (offers.length > 1) boardTimers.push(setInterval(draw, 6000));
 }
 
 // boot.js no debe reiniciar el reproductor mientras alguien configura el servidor con el control remoto

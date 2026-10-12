@@ -7,13 +7,15 @@ import { MenuItem, PRODUCT_WITH_IMAGE, resolveItem, resolveItems } from './menu'
 //   offers  Ofertas del catálogo (automáticas o elegidas), en diseño destacado o grilla
 //   media   Una imagen o un video a pantalla completa
 //   text    Un anuncio de texto
+//   board   Cartelera completa: cabecera con reloj, lista de precios, fotos/video, ofertas rotando y franja de avisos
 
-export type SceneType = 'prices' | 'offers' | 'media' | 'text';
+export type SceneType = 'prices' | 'offers' | 'media' | 'text' | 'board';
 
-export const SCENE_TYPES: SceneType[] = ['prices', 'offers', 'media', 'text'];
+export const SCENE_TYPES: SceneType[] = ['prices', 'offers', 'media', 'text', 'board'];
 export const MENU_STYLES = ['list', 'photo-list', 'cards'];
 export const OFFER_DESIGNS = ['hero', 'grid'];
 export const TEXT_THEMES = ['red', 'blue', 'green', 'orange', 'purple', 'dark'];
+export const BOARD_THEMES = ['dark', 'wine', 'blue', 'green', 'light'];
 export const MIN_DURATION = 3;
 export const MAX_DURATION = 600;
 export const MAX_SCENES = 30;
@@ -87,6 +89,28 @@ export async function validateScenes(businessId: string, input: unknown): Promis
           title: str(cfg.title, 40) || 'OFERTAS'
         }
       });
+    } else if (type === 'board') {
+      if (!raw?.priceListId) return { error: `Escena ${n}: elegí una lista de precios.` };
+      const source = cfg.offersSource === 'manual' ? 'manual' : 'auto';
+      const productIds = strList(cfg.productIds, 50, 64);
+      if (cfg.showOffers !== false && source === 'manual' && productIds.length === 0) return { error: `Escena ${n}: elegí al menos un artículo para las ofertas.` };
+      scenes.push({
+        ...base,
+        priceListId: String(raw.priceListId),
+        config: {
+          title: str(cfg.title, 40),
+          subtitle: str(cfg.subtitle, 60),
+          theme: BOARD_THEMES.includes(cfg.theme as string) ? (cfg.theme as string) : 'dark',
+          showClock: cfg.showClock !== false,
+          categories: strList(cfg.categories, 50, 60, true),
+          mediaIds: strList(cfg.mediaIds, 20, 64),
+          showOffers: cfg.showOffers !== false,
+          offersSource: source,
+          productIds,
+          maxOffers: Math.min(12, Math.max(1, Math.round(Number(cfg.maxOffers) || 6))),
+          ticker: strList(cfg.ticker, 10, 140)
+        }
+      });
     } else if (type === 'media') {
       if (!raw?.mediaId) return { error: `Escena ${n}: elegí una imagen o un video.` };
       scenes.push({ ...base, mediaId: String(raw.mediaId), config: {} });
@@ -102,7 +126,7 @@ export async function validateScenes(businessId: string, input: unknown): Promis
 
   // Todo lo referenciado debe pertenecer al negocio
   const listIds = [...new Set(scenes.map((s) => s.priceListId).filter((x): x is string => !!x))];
-  const mediaIds = [...new Set(scenes.flatMap((s) => [s.mediaId, ...((s.config.sideMediaIds as string[]) ?? [])]).filter((x): x is string => !!x))];
+  const mediaIds = [...new Set(scenes.flatMap((s) => [s.mediaId, ...((s.config.sideMediaIds as string[]) ?? []), ...((s.config.mediaIds as string[]) ?? [])]).filter((x): x is string => !!x))];
   const productIds = [...new Set(scenes.flatMap((s) => (s.config.productIds as string[]) ?? []))];
 
   const [lists, media, products] = await Promise.all([
@@ -132,7 +156,7 @@ export async function replaceScenes(tx: Prisma.TransactionClient, playlistId: st
 
 // ---------- Plantillas de inicio ----------
 
-export type Template = 'prices' | 'prices-offers' | 'full';
+export type Template = 'prices' | 'prices-offers' | 'full' | 'board';
 
 export async function starterScenes(businessId: string, template: Template): Promise<SceneData[]> {
   const list = await prisma.priceList.findFirst({ where: { businessId }, orderBy: { createdAt: 'asc' } });
@@ -140,6 +164,15 @@ export async function starterScenes(businessId: string, template: Template): Pro
 
   const scenes: SceneData[] = [];
   const base = { name: null, enabled: true, priceListId: null as string | null, mediaId: null as string | null };
+  if (template === 'board') {
+    if (list) {
+      scenes.push({
+        ...base, type: 'board', duration: 60, priceListId: list.id,
+        config: { title: '', subtitle: '', theme: 'dark', showClock: true, categories: [], mediaIds: images.map((i) => i.id), showOffers: true, offersSource: 'auto', productIds: [], maxOffers: 6, ticker: [] }
+      });
+    }
+    return scenes;
+  }
   if (list) {
     scenes.push({ ...base, type: 'prices', duration: template === 'prices' ? 30 : 25, priceListId: list.id, config: { style: 'list', categories: [], sideMediaIds: [] } });
   }
@@ -164,6 +197,25 @@ const discountOf = (p: { price: number; oldPrice: number | null }): number | nul
 
 const inCategories = (category: string | null, categories: string[]) =>
   categories.length === 0 || (category ? categories.includes(category) : categories.includes(''));
+
+// Artículos en oferta: elegidos a mano o todos los que tienen precio anterior mayor / etiqueta oferta
+async function loadOffers(businessId: string, source: string, productIds: string[], categories: string[], max: number): Promise<OfferItem[]> {
+  let products;
+  if (source === 'manual') {
+    const found = await prisma.product.findMany({ where: { id: { in: productIds }, businessId, available: true }, ...PRODUCT_WITH_IMAGE });
+    products = productIds.map((id) => found.find((p) => p.id === id)).filter((p): p is NonNullable<typeof p> => !!p);
+  } else {
+    const candidates = await prisma.product.findMany({
+      where: { businessId, available: true, OR: [{ oldPrice: { not: null } }, { badge: { contains: 'oferta', mode: 'insensitive' } }, { badge: { contains: 'promo', mode: 'insensitive' } }] },
+      ...PRODUCT_WITH_IMAGE
+    });
+    products = candidates
+      .filter((p) => isOffer(p) && inCategories(p.category, categories))
+      .sort((a, b) => (discountOf(b) ?? 0) - (discountOf(a) ?? 0) || a.name.localeCompare(b.name))
+      .slice(0, max);
+  }
+  return products.map((p, i) => ({ ...resolveItem({ id: p.id, productId: p.id, product: p, order: i }), discountPercent: discountOf(p) }));
+}
 
 export async function buildScenes(playlistId: string | null, businessId: string): Promise<Record<string, unknown>[]> {
   if (!playlistId) return [];
@@ -199,27 +251,33 @@ export async function buildScenes(playlistId: string | null, businessId: string)
       });
     } else if (it.type === 'offers') {
       const categories: string[] = cfg.categories ?? [];
-      let products;
-      if (cfg.source === 'manual') {
-        const ids: string[] = cfg.productIds ?? [];
-        const found = await prisma.product.findMany({ where: { id: { in: ids }, businessId, available: true }, ...PRODUCT_WITH_IMAGE });
-        products = ids.map((id) => found.find((p) => p.id === id)).filter((p): p is NonNullable<typeof p> => !!p);
-      } else {
-        const candidates = await prisma.product.findMany({
-          where: { businessId, available: true, OR: [{ oldPrice: { not: null } }, { badge: { contains: 'oferta', mode: 'insensitive' } }, { badge: { contains: 'promo', mode: 'insensitive' } }] },
-          ...PRODUCT_WITH_IMAGE
-        });
-        products = candidates
-          .filter((p) => isOffer(p) && inCategories(p.category, categories))
-          .sort((a, b) => (discountOf(b) ?? 0) - (discountOf(a) ?? 0) || a.name.localeCompare(b.name))
-          .slice(0, cfg.maxItems ?? 8);
-      }
-      const offerItems: OfferItem[] = products.map((p, i) => ({
-        ...resolveItem({ id: p.id, productId: p.id, product: p, order: i }),
-        discountPercent: discountOf(p)
-      }));
+      const offerItems = await loadOffers(businessId, cfg.source, cfg.productIds ?? [], categories, cfg.maxItems ?? 8);
       if (offerItems.length === 0) continue; // sin ofertas vigentes: la escena se omite
       out.push({ ...head, name: it.name || cfg.title || 'OFERTAS', design: cfg.design ?? 'hero', items: offerItems });
+    } else if (it.type === 'board' && it.priceList) {
+      const categories: string[] = cfg.categories ?? [];
+      const menuItems = resolveItems(it.priceList).filter((m) => inCategories(m.category, categories));
+      if (menuItems.length === 0) continue;
+      const mediaIds: string[] = cfg.mediaIds ?? [];
+      const media = mediaIds.length
+        ? (await prisma.media.findMany({ where: { id: { in: mediaIds }, businessId } }))
+            .sort((a, b) => mediaIds.indexOf(a.id) - mediaIds.indexOf(b.id))
+            .map((m) => ({ id: m.id, type: m.type, url: m.url, name: m.name }))
+        : [];
+      const offers = cfg.showOffers === false ? [] : await loadOffers(businessId, cfg.offersSource, cfg.productIds ?? [], [], cfg.maxOffers ?? 6);
+      const business = await prisma.business.findUnique({ where: { id: businessId }, select: { name: true } });
+      out.push({
+        ...head,
+        title: cfg.title || business?.name || '',
+        subtitle: cfg.subtitle ?? '',
+        theme: cfg.theme ?? 'dark',
+        showClock: cfg.showClock !== false,
+        ticker: cfg.ticker ?? [],
+        listTitle: it.priceList.name,
+        priceList: { id: it.priceList.id, name: it.priceList.name, groupByCategory: it.priceList.groupByCategory, items: menuItems },
+        media,
+        offers
+      });
     } else if (it.type === 'media' && it.media) {
       out.push({ ...head, media: { id: it.media.id, type: it.media.type, url: it.media.url, name: it.media.name } });
     } else if (it.type === 'text') {

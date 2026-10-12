@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prototipo: cartelera completa</title>
+<style>
+  /* Prototipo de la "cartelera completa": cabecera + lista de precios + video + ofertas en una sola pantalla.
+     Se diseña en 1920x1080 y se escala a cualquier pantalla. */
+  :root{
+    --bg:#0b0d12; --panel:rgba(255,255,255,.07); --line:rgba(255,255,255,.10);
+    --text:#f4f1ea; --muted:#a9a69d; --accent:#e63946; --gold:#f4b942; --green:#2ec27e;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%;background:#000;overflow:hidden;font-family:"Segoe UI",system-ui,sans-serif;color:var(--text)}
+  #stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center;
+    background:radial-gradient(1200px 700px at 80% 0%,#2a1217 0%,transparent 60%),radial-gradient(900px 600px at 0% 100%,#10202e 0%,transparent 60%),var(--bg);
+    display:grid;grid-template-rows:130px 1fr 64px;gap:28px;padding:36px 48px 0}
+
+  /* Cabecera */
+  header{display:flex;align-items:center;justify-content:space-between;padding:0 36px;border-radius:28px;
+    background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid var(--line);
+    box-shadow:0 20px 50px rgba(0,0,0,.45)}
+  .brand{display:flex;align-items:center;gap:26px}
+  .logo{width:76px;height:76px;border-radius:22px;display:grid;place-items:center;font-size:42px;
+    background:linear-gradient(135deg,var(--accent),#a4161a);box-shadow:0 10px 24px rgba(230,57,70,.45)}
+  .brand h1{font-size:60px;letter-spacing:.14em;font-weight:800;text-transform:uppercase}
+  .brand small{display:block;font-size:22px;color:var(--muted);letter-spacing:.3em;text-transform:uppercase;margin-top:2px}
+  .clock{text-align:right}
+  .clock b{display:block;font-size:64px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+  .clock span{font-size:24px;color:var(--muted)}
+
+  /* Cuerpo */
+  main{display:grid;grid-template-columns:1fr 1fr;gap:28px;min-height:0}
+  .card{border-radius:28px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(8px);
+    box-shadow:0 20px 50px rgba(0,0,0,.4);overflow:hidden;min-height:0}
+
+  /* Lista de precios */
+  .list{display:flex;flex-direction:column;padding:26px 34px}
+  .list h2{font-size:30px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:16px;margin-bottom:10px}
+  .list h2::after{content:"";flex:1;height:2px;background:linear-gradient(90deg,var(--gold),transparent)}
+  .rows{flex:1;display:flex;flex-direction:column;justify-content:space-between}
+  .row{display:flex;align-items:center;gap:20px;padding:0 14px;flex:1;border-bottom:1px dashed var(--line);font-size:36px}
+  .row:last-child{border-bottom:0}
+  .row .dot{width:14px;height:14px;border-radius:50%;background:var(--accent);flex:none}
+  .row .name{flex:1;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .unit{font-size:22px;color:var(--muted);margin-right:6px}
+  .row .price{font-weight:800;font-size:42px;font-variant-numeric:tabular-nums}
+  .row.promo .price{color:var(--green)}
+  .row .tag{font-size:20px;font-weight:800;background:var(--accent);padding:4px 12px;border-radius:999px;letter-spacing:.05em}
+
+  /* Columna derecha */
+  .right{display:grid;grid-template-rows:1fr 1fr;gap:28px;min-height:0}
+  .media{position:relative}
+  .slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.2s}
+  .slide.on{opacity:1}
+  .media::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.65))}
+  .media .cap{position:absolute;left:30px;bottom:22px;z-index:2;font-size:30px;font-weight:600;letter-spacing:.04em}
+  .media .live{position:absolute;right:26px;top:22px;z-index:2;background:rgba(0,0,0,.55);padding:8px 18px;border-radius:999px;font-size:20px;letter-spacing:.2em}
+
+  /* Oferta destacada */
+  .offer{position:relative;display:grid;grid-template-columns:42% 1fr;background:linear-gradient(135deg,#3a0f14,#16090b)}
+  .offer .ph{background-size:cover;background-position:center;position:relative}
+  .offer .ph::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 60%,#2a0c10)}
+  .offer .body{padding:28px 34px;display:flex;flex-direction:column;justify-content:center;gap:6px}
+  .ribbon{align-self:flex-start;background:var(--accent);color:#fff;font-weight:800;letter-spacing:.3em;font-size:24px;padding:8px 22px;border-radius:999px;box-shadow:0 8px 20px rgba(230,57,70,.5)}
+  .offer h3{font-size:44px;line-height:1.05;margin-top:10px;font-weight:700}
+  .offer .old{font-size:30px;color:var(--muted);text-decoration:line-through;margin-top:8px}
+  .offer .now{font-size:84px;font-weight:900;line-height:1;color:var(--gold);font-variant-numeric:tabular-nums;text-shadow:0 6px 30px rgba(244,185,66,.35)}
+  .offer .now small{font-size:34px;color:var(--muted);font-weight:500;margin-left:8px}
+  .off{position:absolute;right:26px;top:22px;width:118px;height:118px;border-radius:50%;background:var(--green);display:grid;place-items:center;
+    font-size:44px;font-weight:900;transform:rotate(10deg);box-shadow:0 12px 30px rgba(46,194,126,.45);text-align:center;line-height:1}
+  .off small{display:block;font-size:20px;font-weight:700}
+  .fade{animation:in .8s both}
+  @keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  /* Pie con mensaje en movimiento */
+  footer{border-radius:20px 20px 0 0;background:var(--accent);display:flex;align-items:center;overflow:hidden;font-size:30px;font-weight:700;letter-spacing:.06em}
+  footer .lbl{background:#7d0f17;height:100%;display:grid;place-items:center;padding:0 34px;letter-spacing:.2em}
+  footer .tick{white-space:nowrap;padding-left:100%;animation:tick 32s linear infinite}
+  @keyframes tick{to{transform:translateX(-100%)}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header>
+    <div class="brand">
+      <div class="logo">🥩</div>
+      <div><h1>Carnicería</h1><small>Don Ramón · desde 1998</small></div>
+    </div>
+    <div class="clock"><b id="hora">12:02</b><span id="fecha">sábado 11 de julio</span></div>
+  </header>
+
+  <main>
+    <section class="card list">
+      <h2>Precios del día</h2>
+      <div class="rows" id="rows"></div>
+    </section>
+
+    <div class="right">
+      <section class="card media" id="media">
+        <div class="slide on" style="background-image:url(asado.png)"></div>
+        <div class="slide" style="background-image:url(vacio.png)"></div>
+        <div class="slide" style="background-image:url(costilla.png)"></div>
+        <span class="live">EN VIVO · PARRILLA</span>
+        <div class="cap" id="cap">Cortes frescos todos los días</div>
+      </section>
+
+      <section class="card offer" id="offer"></section>
+    </div>
+  </main>
+
+  <footer>
+    <div class="lbl">AVISO</div>
+    <div class="tick">Hoy 15% de descuento pagando en efectivo &nbsp;·&nbsp; Pedí tu corte a medida &nbsp;·&nbsp; Cerramos el lunes por feriado &nbsp;·&nbsp; Envíos sin cargo desde $20.000</div>
+  </footer>
+</div>
+
+<script>
+  // Datos de ejemplo (en el sistema vendrán de la lista de precios y de los artículos en oferta)
+  const lista = [
+    ['Asado de tira', 'kg', 9800],
+    ['Vacío', 'kg', 11200, 'promo'],
+    ['Bife de chorizo', 'kg', 13500],
+    ['Costilla', 'kg', 8400, 'promo'],
+    ['Bondiola de cerdo', 'kg', 7600],
+    ['Chorizo parrillero', 'kg', 6900],
+    ['Pechuga de pollo', 'kg', 7200],
+    ['Pollo entero', 'kg', 4300],
+  ];
+  const ofertas = [
+    {n:'Vacío novillito', img:'vacio.png', viejo:13900, nuevo:11200},
+    {n:'Costilla de ternera', img:'costilla.png', viejo:9900, nuevo:8400},
+    {n:'Bife de chorizo', img:'bife.png', viejo:15500, nuevo:13500},
+    {n:'Chorizo parrillero', img:'chorizo.png', viejo:7900, nuevo:6900},
+  ];
+  const $ = s => document.querySelector(s);
+  const money = n => '$ ' + n.toLocaleString('es-AR');
+
+  $('#rows').innerHTML = lista.map(([n,u,p,t]) =>
+    `<div class="row ${t||''}"><span class="dot"></span><span class="name">${n}</span>${t?'<span class="tag">OFERTA</span>':''}<span class="unit">/${u}</span><span class="price">${money(p)}</span></div>`).join('');
+
+  // Reloj
+  const tick = () => {
+    const d = new Date();
+    $('#hora').textContent = d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    $('#fecha').textContent = d.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+  };
+  tick(); setInterval(tick, 10000);
+
+  // Fotos / video que rotan
+  const slides = [...document.querySelectorAll('.slide')];
+  const caps = ['Cortes frescos todos los días','Parrilla lista para el fin de semana','Nuestra selección de ternera'];
+  let si = 0;
+  setInterval(() => {
+    slides[si].classList.remove('on'); si = (si + 1) % slides.length;
+    slides[si].classList.add('on'); $('#cap').textContent = caps[si];
+  }, 5000);
+
+  // Oferta destacada que rota
+  let oi = 0;
+  const showOffer = () => {
+    const o = ofertas[oi]; const pct = Math.round((1 - o.nuevo / o.viejo) * 100);
+    $('#offer').innerHTML =
+      `<div class="ph fade" style="background-image:url(${o.img})"></div>
+       <div class="body fade"><span class="ribbon">OFERTA</span><h3>${o.n}</h3>
+       <div class="old">Antes ${money(o.viejo)}</div>
+       <div class="now">${money(o.nuevo)}<small>/kg</small></div></div>
+       <div class="off fade"><div>-${pct}%<small>HOY</small></div></div>`;
+    oi = (oi + 1) % ofertas.length;
+  };
+  showOffer(); setInterval(showOffer, 6000);
+
+  // Escala 1920x1080 a la ventana
+  const fit = () => { const k = Math.min(innerWidth / 1920, innerHeight / 1080); $('#stage').style.transform = `translate(-50%,-50%) scale(${k})`; };
+  addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>
