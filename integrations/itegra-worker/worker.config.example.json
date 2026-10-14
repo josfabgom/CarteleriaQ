@@ -1,0 +1,7 @@
+{
+  "servidor": "https://carteleriaq.soporteq.tech",
+  "claveIntegracion": "itg_PEGAR_AQUI_LA_CLAVE_DEL_PANEL",
+  "rutaBase": "C:\Itegra\Datos",
+  "cadaMinutos": 5,
+  "tiposDeArticulo": ["P", "N"]
+}

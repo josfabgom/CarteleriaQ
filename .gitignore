@@ -12,3 +12,11 @@ player-app/android/app/build/
 backups/
 *.tsbuildinfo
 downloads/
+
+# Base de datos de Itegra (datos del cliente, no se sube al repositorio)
+base de Itegra/
+
+# Worker de Itegra: configuración con la clave secreta, estado y registro
+integrations/itegra-worker/worker.config.json
+integrations/itegra-worker/estado.json
+integrations/itegra-worker/worker.log*

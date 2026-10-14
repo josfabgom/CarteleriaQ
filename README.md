@@ -8,6 +8,7 @@ Plataforma de cartelería digital para vender como servicio: cada negocio tiene 
 | `web-dashboard/` | Panel web (React + Vite): administrador y negocios |
 | `player-app/` | Reproductor para TV: Android TV (APK, Capacitor), Windows (Electron) y web (`/player`) |
 | `deploy/` | Caddy (HTTPS) y script de respaldos para el VPS |
+| `integrations/itegra-worker/` | Worker que lee la base de Itegra (balanzas) y sube los artículos a la nube |
 
 ## Cómo funciona
 

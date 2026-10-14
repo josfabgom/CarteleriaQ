@@ -9,6 +9,7 @@ import PricingManager from './components/PricingManager';
 import ProductManager from './components/ProductManager';
 import ScreenManager from './components/ScreenManager';
 import CycleManager from './components/CycleManager';
+import IntegrationManager from './components/IntegrationManager';
 
 const BUSINESS_NAV = [
   { id: 'dashboard', label: 'Inicio' },
@@ -18,6 +19,7 @@ const BUSINESS_NAV = [
   { id: 'ajuste', label: 'Ajuste de precios' },
   { id: 'precios', label: 'Listas de Pantalla' },
   { id: 'ciclos', label: 'Ciclos' },
+  { id: 'integracion', label: 'Integración Itegra' },
   { id: 'cuenta', label: 'Mi cuenta' }
 ];
 
@@ -207,6 +209,12 @@ const App = () => {
           {activeTab === 'ciclos' && !isAdmin && (
             <div>
               <CycleManager openCycleId={cycleToEdit} onOpened={() => setCycleToEdit(null)} />
+            </div>
+          )}
+
+          {activeTab === 'integracion' && !isAdmin && (
+            <div>
+              <IntegrationManager />
             </div>
           )}
 

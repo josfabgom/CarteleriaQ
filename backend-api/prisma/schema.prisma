@@ -8,20 +8,21 @@ datasource db {
 
 // Cliente (negocio) al que se le vende el servicio. Todos sus datos cuelgan de aquí.
 model Business {
-  id             String   @id @default(uuid())
-  name           String
-  active         Boolean  @default(true)
-  maxScreens     Int      @default(3)
-  storageLimitMb Int      @default(1024)
-  user           User?
-  screens        Screen[]
-  playlists      Playlist[]
-  media          Media[]
-  priceLists     PriceList[]
-  products       Product[]
-  priceChanges   PriceChange[]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String           @id @default(uuid())
+  name            String
+  active          Boolean          @default(true)
+  maxScreens      Int              @default(3)
+  storageLimitMb  Int              @default(1024)
+  user            User?
+  screens         Screen[]
+  playlists       Playlist[]
+  media           Media[]
+  priceLists      PriceList[]
+  products        Product[]
+  priceChanges    PriceChange[]
+  integrationKeys IntegrationKey[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 }
 
 model User {
@@ -91,30 +92,30 @@ model PlaylistItem {
 }
 
 model Media {
-  id         String         @id @default(uuid())
-  name       String
-  type       String // image, video
-  url        String // /uploads/<businessId>/<archivo>
-  size       Int? // bytes
-  businessId String
-  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  items      PlaylistItem[]
-  productImages Product[]   @relation("ProductImage")
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
+  id            String         @id @default(uuid())
+  name          String
+  type          String // image, video
+  url           String // /uploads/<businessId>/<archivo>
+  size          Int? // bytes
+  businessId    String
+  business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items         PlaylistItem[]
+  productImages Product[]      @relation("ProductImage")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model PriceList {
-  id            String         @id @default(uuid())
-  name          String
-  businessId    String
-  business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  groupByCategory Boolean      @default(false) // agrupar los artículos por categoría en la pantalla
-  hideUnavailable Boolean      @default(false) // ocultar los artículos sin stock (si no, se muestran como AGOTADO)
-  items         PriceItem[]
-  playlistItems PlaylistItem[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id              String         @id @default(uuid())
+  name            String
+  businessId      String
+  business        Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  groupByCategory Boolean        @default(false) // agrupar los artículos por categoría en la pantalla
+  hideUnavailable Boolean        @default(false) // ocultar los artículos sin stock (si no, se muestran como AGOTADO)
+  items           PriceItem[]
+  playlistItems   PlaylistItem[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 // Artículo dentro de una lista de pantalla.
@@ -138,9 +139,9 @@ model PriceItem {
 }
 
 model Product {
-  id           String   @id @default(uuid())
+  id           String      @id @default(uuid())
   businessId   String
-  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business     Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
   internalCode String?
   barcode      String?
   name         String
@@ -150,12 +151,14 @@ model Product {
   unit         String? // unidad de venta: "kg", "unidad", "100 g", "litro"…
   oldPrice     Float? // precio anterior (se muestra tachado)
   badge        String? // etiqueta: "OFERTA", "NUEVO"…
-  available    Boolean  @default(true) // false = sin stock
+  available    Boolean     @default(true) // false = sin stock
+  source       String? // de dónde viene: null = cargado a mano, "itegra" = sincronizado desde Itegra
+  autoHidden   Boolean     @default(false) // true = la sincronización lo marcó sin stock porque dejó de existir en el origen
   imageId      String?
-  image        Media?   @relation("ProductImage", fields: [imageId], references: [id], onDelete: SetNull)
+  image        Media?      @relation("ProductImage", fields: [imageId], references: [id], onDelete: SetNull)
   priceItems   PriceItem[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   @@unique([businessId, internalCode])
   @@unique([businessId, barcode])
@@ -163,24 +166,24 @@ model Product {
 
 // Cambio masivo de precios (inmediato o programado). Guarda la regla y, al aplicarse, el detalle para poder deshacerlo.
 model PriceChange {
-  id             String    @id @default(uuid())
+  id             String            @id @default(uuid())
   businessId     String
-  business       Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business       Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   description    String
   operation      String // percent | amount
   value          Float
-  roundStep      Float     @default(0)
-  roundDirection String    @default("nearest") // nearest | up | down
+  roundStep      Float             @default(0)
+  roundDirection String            @default("nearest") // nearest | up | down
   scope          Json // { type: all|categories|products, categories?, productIds?, includeManual? }
-  status         String    @default("pending") // pending | applying | applied | undone | cancelled | failed
+  status         String            @default("pending") // pending | applying | applied | undone | cancelled | failed
   scheduledFor   DateTime?
   appliedAt      DateTime?
   undoneAt       DateTime?
-  affectedCount  Int       @default(0)
+  affectedCount  Int               @default(0)
   errorMessage   String?
   undoSummary    String?
   items          PriceChangeItem[]
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime          @default(now())
 
   @@index([businessId, createdAt])
   @@index([status, scheduledFor])
@@ -197,4 +200,23 @@ model PriceChangeItem {
   newPrice   Float
 
   @@index([changeId])
+}
+
+// Clave para que un programa externo (por ejemplo el worker de Itegra) suba datos a UN negocio.
+// El negocio lo decide la clave, no el programa: por eso un worker mal instalado no puede tocar a otro cliente.
+model IntegrationKey {
+  id          String    @id @default(uuid())
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name        String
+  prefix      String // primeros caracteres, para reconocerla en el panel
+  keyHash     String    @unique // SHA-256 de la clave; la clave completa se muestra una sola vez
+  fingerprint String? // identidad de la base de Itegra a la que quedó atada
+  lastSeenAt  DateTime?
+  lastSyncAt  DateTime?
+  lastSummary Json?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([businessId])
 }

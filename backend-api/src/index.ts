@@ -17,6 +17,7 @@ import priceListsRoutes from './routes/priceLists';
 import productsRoutes from './routes/products';
 import pricingRoutes from './routes/pricing';
 import cyclesRoutes from './routes/cycles';
+import integrationsRoutes from './routes/integrations';
 import { migrateLegacyPlaylists } from './scenes';
 import { startPriceScheduler } from './pricing';
 
@@ -47,6 +48,7 @@ app.use('/api/pricelists', priceListsRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/cycles', cyclesRoutes);
+app.use('/api/integrations', integrationsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
