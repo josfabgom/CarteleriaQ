@@ -20,3 +20,6 @@ base de Itegra/
 integrations/itegra-worker/worker.config.json
 integrations/itegra-worker/estado.json
 integrations/itegra-worker/worker.log*
+integrations/itegra-worker.zip
+integrations/itegra-worker/dist/
+integrations/itegra-worker-windows.zip

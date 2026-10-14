@@ -17,11 +17,21 @@ const flag = (name) => args.includes(name);
 const option = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
 
 if (flag('--ayuda') || flag('-h')) {
-  console.log(fs.readFileSync(__filename, 'utf8').split('\n').slice(1, 9).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
+  console.log([
+    'Worker de Itegra -> CarteleriaQ', '',
+    '  --previsualizar   muestra qué cambiaría, sin aplicar nada',
+    '  --aplicar         primera carga real (después queda funcionando solo)',
+    '  (sin opciones)    modo normal: revisa cada X minutos y sube solo las diferencias',
+    '  --una-vez         una sola revisión y termina',
+    '  --forzar          salta las protecciones de lectura incompleta',
+    '  --config <ruta>   usa otro archivo de configuración'
+  ].join('\n'));
   process.exit(0);
 }
 
-const configPath = path.resolve(option('--config') || path.join(__dirname, 'worker.config.json'));
+// Empaquetado como .exe, los archivos de configuración están junto al ejecutable; como script, junto al código
+const appDir = /^node(\.exe)?$/i.test(path.basename(process.execPath)) ? __dirname : path.dirname(process.execPath);
+const configPath = path.resolve(option('--config') || path.join(appDir, 'worker.config.json'));
 const baseDir = path.dirname(configPath);
 const statePath = path.join(baseDir, 'estado.json');
 const logPath = path.join(baseDir, 'worker.log');
@@ -116,7 +126,7 @@ async function runOnce(cfg) {
   log(`${mode === 'preview' ? 'VISTA PREVIA' : 'Sincronizado'} con "${res.data.business}": ${describe(res.data)}.`);
   if (mode === 'preview') {
     for (const s of res.data.sampleCreated || []) log(`   nuevo: ${s.code} ${s.name}  [${s.category}]  $${s.price}${s.unit ? ' / ' + s.unit : ''}`);
-    if (!confirmado || flag('--previsualizar')) log('No se aplicó nada. Si el negocio es el correcto, ejecutá: node worker.js --aplicar');
+    if (!confirmado || flag('--previsualizar')) log('No se aplicó nada. Si el negocio es el correcto, ejecutá el worker con --aplicar (node worker.js --aplicar, o worker.exe --aplicar).');
     return { ok: true };
   }
   saveState({ confirmado: true, lastHash: hash, lastCount: items.length, lastFullAt: full ? Date.now() : state.lastFullAt, lastSyncAt: Date.now() });

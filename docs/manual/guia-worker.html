@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Guía de instalación del worker de Itegra</title>
+<style>
+  @page { size: A4; margin: 18mm 18mm 20mm 18mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Calibri, Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1f2937; margin: 0; }
+  h1, h2, h3 { color: #0f172a; line-height: 1.2; }
+  h1 { font-size: 20pt; margin: 0 0 5mm; padding-bottom: 3mm; border-bottom: 3px solid #e63946; }
+  h1.pb { page-break-before: always; }
+  h2 { font-size: 13.5pt; margin: 7mm 0 3mm; color: #b91c1c; }
+  h3 { font-size: 11.5pt; margin: 4mm 0 2mm; }
+  p { margin: 0 0 3mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.2mm; }
+  code { font-family: Consolas, monospace; background: #f1f5f9; padding: 0 1.5mm; border-radius: 1mm; font-size: 9.5pt; }
+  pre { font-family: Consolas, monospace; background: #0f172a; color: #e2e8f0; padding: 3mm 4mm; border-radius: 2mm; font-size: 9pt; white-space: pre-wrap; margin: 0 0 4mm; page-break-inside: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 0 0 4mm; font-size: 9.8pt; }
+  th { background: #0f172a; color: #fff; text-align: left; padding: 2mm 3mm; }
+  td { border-bottom: 1px solid #e5e7eb; padding: 2mm 3mm; vertical-align: top; }
+  tr { page-break-inside: avoid; }
+  .note, .tip, .warn { padding: 3mm 4mm; border-radius: 2mm; margin: 0 0 4mm; border-left: 4px solid; page-break-inside: avoid; }
+  .note { background: #eff6ff; border-color: #2563eb; }
+  .tip { background: #ecfdf5; border-color: #059669; }
+  .warn { background: #fff7ed; border-color: #ea580c; }
+  .note b:first-child, .tip b:first-child, .warn b:first-child { display: block; margin-bottom: 1mm; }
+  .steps { counter-reset: s; list-style: none; padding-left: 0; }
+  .steps li { counter-increment: s; position: relative; padding-left: 9mm; margin-bottom: 2.5mm; page-break-inside: avoid; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 6mm; height: 6mm; border-radius: 50%; background: #e63946; color: #fff; font-weight: 700; font-size: 9pt; text-align: center; line-height: 6mm; }
+  .check li { list-style: none; position: relative; padding-left: 7mm; }
+  .check li::before { content: "☐"; position: absolute; left: 0; font-size: 12pt; line-height: 1.2; }
+  .head { display: flex; align-items: center; gap: 5mm; margin-bottom: 6mm; }
+  .logo { width: 16mm; height: 16mm; border-radius: 4mm; background: linear-gradient(135deg, #e63946, #7d0f17); color: #fff; font-size: 22pt; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .head h1 { border: 0; margin: 0; padding: 0; font-size: 22pt; }
+  .head p { margin: 0; color: #64748b; }
+  .flow { display: flex; gap: 2mm; margin: 0 0 5mm; }
+  .flow div { flex: 1; text-align: center; border: 1px solid #cbd5e1; border-radius: 2mm; padding: 2.5mm 1mm; font-size: 9pt; background: #f8fafc; }
+  .flow b { display: block; color: #b91c1c; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="logo">Q</div>
+  <div>
+    <h1>Guía de instalación del worker de Itegra</h1>
+    <p>Sincronización automática de artículos: Itegra → CarteleriaQ</p>
+  </div>
+</div>
+
+<h2>Qué se va a instalar</h2>
+<p>Un programa chico (<code>worker.exe</code>) que corre en la PC donde está Itegra. Cada pocos minutos lee los artículos de la base de Itegra y sube a la nube los que cambiaron: <b>código, nombre, precio y unidad</b>. Las categorías se asignan solas la primera vez.</p>
+<div class="flow">
+  <div><b>1. PC de Itegra</b>worker.exe lee la base (solo lectura)</div>
+  <div><b>2. Internet</b>envía solo las diferencias (HTTPS)</div>
+  <div><b>3. CarteleriaQ</b>actualiza el catálogo del cliente</div>
+  <div><b>4. Las TVs</b>muestran los precios nuevos</div>
+</div>
+<ul>
+  <li><b>No modifica Itegra</b>: solo lee la tabla de artículos. No toca clientes, usuarios, ventas ni stock.</li>
+  <li><b>No abre puertos</b>: solo se conecta hacia afuera (HTTPS), no hay que configurar el router.</li>
+  <li><b>Cada cliente tiene su clave</b>: la clave decide a qué negocio se sube todo, así que no hay riesgo de actualizar al cliente equivocado.</li>
+</ul>
+
+<h2>Antes de empezar (checklist)</h2>
+<ul class="check">
+  <li>La PC de Itegra tiene <b>Windows 10 u 11 de 64 bits</b> (el programa no corre en Windows 7 u 8) y tiene <b>internet</b>.</li>
+  <li>La PC <b>queda prendida</b> durante el horario de trabajo (si se apaga, el worker se pone al día al encender).</li>
+  <li>Sé en qué <b>carpeta</b> guarda Itegra su base: es la que contiene el archivo <code>Datos.script</code> (y normalmente <code>Datos.log</code>). Se puede buscar con el buscador de Windows.</li>
+  <li>El cliente ya tiene su <b>negocio creado</b> en CarteleriaQ (usuario y contraseña).</li>
+  <li>Tengo el archivo <b>itegra-worker-windows.zip</b>.</li>
+  <li>Tengo permisos de <b>administrador</b> en esa PC (hace falta solo para el paso 6).</li>
+</ul>
+
+<h1 class="pb">Instalación paso a paso</h1>
+
+<h2>Paso 1. En el panel: generar la clave del cliente</h2>
+<ol class="steps">
+  <li>Entrá a <b>https://carteleriaq.soporteq.tech</b> con el usuario del cliente (o pedile que lo haga él).</li>
+  <li>En el menú de la izquierda, abrí <b>Integración Itegra</b>.</li>
+  <li>Escribí un nombre para la clave, por ejemplo <i>PC del mostrador</i>, y tocá <b>Generar clave</b>.</li>
+  <li>Aparece un recuadro amarillo con un texto parecido a este. Tocá <b>Copiar configuración</b>:
+<pre>{
+  "servidor": "https://carteleriaq.soporteq.tech",
+  "claveIntegracion": "itg_xxxxxxxxxxxxxxxxxxxxxxxx",
+  "rutaBase": "C:\\Itegra\\Datos",
+  "cadaMinutos": 5,
+  "tiposDeArticulo": ["P", "N"]
+}</pre></li>
+</ol>
+<div class="warn"><b>La clave se muestra una sola vez</b>
+Si cerrás el recuadro sin copiarla, hay que revocarla y generar otra. Tratala como una contraseña: no la mandes por chats grupales ni la subas a ningún repositorio.</div>
+
+<h2>Paso 2. En la PC de Itegra: copiar el programa</h2>
+<ol class="steps">
+  <li>Copiá <code>itegra-worker-windows.zip</code> a la PC (pendrive, correo o descarga).</li>
+  <li>Creá una carpeta, por ejemplo <code>C:\CarteleriaQ\worker</code>, y descomprimí el zip adentro. Deben quedar estos archivos: <code>worker.exe</code>, <code>worker.config.example.json</code>, <code>instalar-tarea.bat</code>, <code>desinstalar-tarea.bat</code> y <code>LEEME.md</code>.</li>
+</ol>
+
+<h2>Paso 3. Crear el archivo de configuración</h2>
+<ol class="steps">
+  <li>En esa carpeta, creá un archivo de texto nuevo (clic derecho → Nuevo → Documento de texto) y llamalo exactamente <code>worker.config.json</code>. Cuidado: que no quede como <code>worker.config.json.txt</code> (activá «Extensiones de nombre de archivo» en el Explorador si hace falta).</li>
+  <li>Abrilo con el Bloc de notas y pegá lo que copiaste en el paso 1.</li>
+  <li>Corregí <code>rutaBase</code> con la carpeta real de la base de Itegra. <b>Las barras van dobles</b>: <code>"C:\\Itegra\\Datos"</code>. Guardá.</li>
+</ol>
+<div class="tip"><b>¿Cuál es la carpeta correcta?</b>
+La que contiene <code>Datos.script</code>. Conviene apuntar a la carpeta de la instalación real de Itegra (no a una copia suelta), porque Itegra guarda los cambios más recientes en <code>Datos.log</code> y solo con la carpeta completa el worker los ve al instante.</div>
+
+<h2>Paso 4. Probar sin cargar nada (vista previa)</h2>
+<ol class="steps">
+  <li>En la carpeta del worker, mantené <kbd>Shift</kbd> + clic derecho en un espacio vacío → <b>Abrir ventana de PowerShell aquí</b> (o escribí <code>cmd</code> en la barra de direcciones del Explorador y Enter).</li>
+  <li>Ejecutá:
+<pre>.\worker.exe --previsualizar</pre></li>
+  <li>La primera vez, Windows puede mostrar «Windows protegió su PC»: tocá <b>Más información</b> → <b>Ejecutar de todas formas</b> (el programa no está firmado digitalmente).</li>
+  <li>Tiene que aparecer algo así. <b>Verificá que el nombre del negocio sea el del cliente</b>:
+<pre>Base leída: 790 artículos; se suben 764, se omiten 26 ...
+VISTA PREVIA con "Nombre del Negocio": nuevos 764, actualizados 0 ...
+No se aplicó nada. Si el negocio es el correcto, ejecutá ...</pre></li>
+</ol>
+<p>Los artículos omitidos son los de tipo <b>R</b> y <b>X</b> de Itegra, que no se suben. Si el número de artículos no coincide con lo que esperás, revisá <code>rutaBase</code>.</p>
+
+<h2>Paso 5. Primera carga real</h2>
+<ol class="steps">
+  <li>Si el negocio y las cantidades son correctos, ejecutá:
+<pre>.\worker.exe --aplicar</pre></li>
+  <li>Debe decir <code>Sincronizado con "Nombre del Negocio": nuevos 764 ...</code>.</li>
+  <li>En el panel, abrí <b>Catálogo de Artículos</b>: los artículos aparecen con su categoría, precio y unidad.</li>
+</ol>
+
+<h2>Paso 6. Dejarlo funcionando solo</h2>
+<ol class="steps">
+  <li>En la carpeta del worker, clic derecho sobre <code>instalar-tarea.bat</code> → <b>Ejecutar como administrador</b>.</li>
+  <li>Debe decir que la tarea se creó con éxito y que el worker quedó funcionando. Se instala como tarea programada de Windows llamada <b>CarteleriaQ Itegra Worker</b>: arranca con la PC y revisa cada 5 minutos.</li>
+</ol>
+<div class="note"><b>Para tener en cuenta</b>
+La tarea corre como cuenta SYSTEM. Si la base de Itegra está en una carpeta local (C:\...), no hay problema. Si está en una carpeta compartida de otra PC, puede que SYSTEM no tenga acceso: en ese caso conviene instalar el worker en la PC que tiene la base.</div>
+
+<h1 class="pb">Verificación y uso diario</h1>
+
+<h2>Cómo saber que funciona</h2>
+<table>
+  <tr><th style="width:34%">Dónde</th><th>Qué tenés que ver</th></tr>
+  <tr><td>Panel → Integración Itegra</td><td>La clave figura <b>Conectada</b> (señal de los últimos 15 minutos), «Atada a una base de Itegra» y el último resultado (cuántos nuevos, actualizados y sin cambios).</td></tr>
+  <tr><td>Archivo <code>worker.log</code> (en la carpeta del worker)</td><td>Una línea por revisión: «Sin cambios» o «Sincronizado con...». Se rota solo a los 2 MB.</td></tr>
+  <tr><td>Programador de tareas de Windows (<code>taskschd.msc</code>)</td><td>La tarea «CarteleriaQ Itegra Worker» con estado <i>En ejecución</i>.</td></tr>
+  <tr><td>Prueba real</td><td>Cambiá el precio de un artículo en Itegra. A los pocos minutos debe cambiar en el Catálogo del panel y en las TVs.</td></tr>
+</table>
+
+<h2>Cómo se comporta</h2>
+<ul>
+  <li><b>Itegra manda</b> sobre código, nombre, precio y unidad. Lo que el cliente edite en el panel (categoría, foto, etiqueta, precio anterior) <b>no se pisa</b>.</li>
+  <li>Un artículo que se borra en Itegra queda <b>sin stock</b> en la nube (no se elimina). Si vuelve a existir, se repone.</li>
+  <li>Los artículos <b>cargados a mano</b> en el panel con el mismo código que uno de Itegra <b>no se tocan</b>: el panel avisa cuántos se omitieron.</li>
+  <li>Una vez al día hace una revisión completa (la que marca sin stock a los que ya no existen).</li>
+  <li>Si la lectura viene incompleta (faltan muchos artículos de golpe), <b>no aplica nada</b> y lo registra en el log.</li>
+  <li>Si se corta internet o se apaga la PC, se pone al día solo al volver.</li>
+</ul>
+
+<h2>Comandos útiles</h2>
+<table>
+  <tr><th style="width:36%">Comando</th><th>Para qué</th></tr>
+  <tr><td><code>worker.exe --previsualizar</code></td><td>Ver qué cambiaría, sin aplicar nada.</td></tr>
+  <tr><td><code>worker.exe --aplicar</code></td><td>Primera carga real.</td></tr>
+  <tr><td><code>worker.exe --una-vez</code></td><td>Una revisión manual ahora mismo.</td></tr>
+  <tr><td><code>worker.exe --forzar</code></td><td>Salta las protecciones (solo si el cambio grande es real).</td></tr>
+  <tr><td><code>worker.exe --ayuda</code></td><td>Muestra las opciones.</td></tr>
+</table>
+
+<h2>Problemas frecuentes</h2>
+<table>
+  <tr><th style="width:38%">Mensaje o síntoma</th><th>Qué hacer</th></tr>
+  <tr><td><code>No encuentro el archivo de configuración</code></td><td><code>worker.config.json</code> no está junto a <code>worker.exe</code>, o quedó con extensión doble (<code>.json.txt</code>).</td></tr>
+  <tr><td><code>"claveIntegracion" no es válida</code></td><td>Debe empezar con <code>itg_</code>. Volvé a copiar la configuración del panel.</td></tr>
+  <tr><td><code>JSON</code> con error al arrancar</td><td>Revisá comillas y comas; en <code>rutaBase</code> las barras deben ser dobles <code>\\</code>.</td></tr>
+  <tr><td><code>No encuentro la base de Itegra</code></td><td>Revisá <code>rutaBase</code>: debe ser la carpeta que contiene <code>Datos.script</code>.</td></tr>
+  <tr><td><code>La clave ... no es válida o fue revocada</code></td><td>Generá una clave nueva en el panel y actualizá <code>worker.config.json</code>.</td></tr>
+  <tr><td><code>Esta clave ya está vinculada a otra base de Itegra</code></td><td>Cambió la base (PC nueva, Itegra reinstalado). En el panel: <b>Desvincular base</b> en esa clave y volver a ejecutar.</td></tr>
+  <tr><td><code>Parece un error de lectura</code></td><td>Itegra puede estar importando datos en ese momento. Esperá y reintentá; si el cambio es real, usá <code>--forzar</code>.</td></tr>
+  <tr><td>Panel: «Sin señal»</td><td>La PC está apagada o sin internet, o la tarea no está corriendo (revisá <code>taskschd.msc</code> y <code>worker.log</code>).</td></tr>
+  <tr><td>No se pudo conectar / tiempo agotado</td><td>Revisá internet, y que el antivirus o el firewall no bloqueen <code>worker.exe</code> hacia <code>carteleriaq.soporteq.tech</code> (puerto 443).</td></tr>
+  <tr><td>Los precios no cambian</td><td>Confirmá que Itegra efectivamente guardó el cambio. Si <code>rutaBase</code> apunta a una copia vieja del <code>.script</code>, no verá los cambios nuevos.</td></tr>
+</table>
+
+<h2>Mantenimiento</h2>
+<h3>Cambiar la clave o la configuración</h3>
+<p>Editá <code>worker.config.json</code>. El cambio se toma en la próxima ejecución; para aplicarlo ya, ejecutá en una consola de administrador: <code>schtasks /End /TN "CarteleriaQ Itegra Worker"</code> y luego <code>schtasks /Run /TN "CarteleriaQ Itegra Worker"</code>.</p>
+<h3>Actualizar el programa</h3>
+<ol>
+  <li>Detené la tarea: <code>schtasks /End /TN "CarteleriaQ Itegra Worker"</code></li>
+  <li>Reemplazá <code>worker.exe</code> por el nuevo (no toques <code>worker.config.json</code> ni <code>estado.json</code>).</li>
+  <li>Iniciá la tarea: <code>schtasks /Run /TN "CarteleriaQ Itegra Worker"</code></li>
+</ol>
+<h3>Desinstalar</h3>
+<p>Ejecutá <code>desinstalar-tarea.bat</code> como administrador y borrá la carpeta. En el panel, <b>Revocar</b> la clave de esa PC.</p>
+<h3>Si la PC se pierde o la clave se filtra</h3>
+<p>En el panel → Integración Itegra → <b>Revocar</b>. El worker deja de funcionar al instante. Después se genera otra clave para la nueva instalación.</p>
+
+<h2>Notas para el técnico</h2>
+<ul>
+  <li>Los tipos de artículo de Itegra: <b>P</b> = pesable (se sube como <code>kg</code>), <b>N</b> = por unidad (<code>unidad</code>). Los tipos <b>R</b> y <b>X</b> no se suben (se puede cambiar con <code>tiposDeArticulo</code> en la configuración).</li>
+  <li>Los precios de Itegra a veces traen centavos «de ruido» (por ejemplo $26.600,01). Se suben tal cual.</li>
+  <li>Si el cliente <b>ya cargó su catálogo a mano</b> (por ejemplo, importando un archivo), esos artículos figurarán como «omitidos por conflicto» y el worker no los va a actualizar. Hay que acordar con soporte cómo adoptarlos antes de activar el worker.</li>
+  <li>El archivo <code>estado.json</code> guarda qué se envió por última vez: no lo borres salvo que quieras repetir la primera carga (se vuelve a pedir <code>--aplicar</code>).</li>
+</ul>
+
+</body>
+</html>

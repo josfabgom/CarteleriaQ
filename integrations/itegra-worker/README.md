@@ -19,8 +19,15 @@ Cada cliente tiene su propia **clave de integración** (se genera en el panel, s
 
 ## Instalación en la PC del cliente
 
-1. Instalar **Node.js** (versión LTS, 18 o más nueva) desde https://nodejs.org
-2. Copiar esta carpeta (`itegra-worker`) a la PC, por ejemplo a `C:\CarteleriaQ\itegra-worker`.
+Hay dos formas; el resto de los pasos es igual:
+
+- **Con `worker.exe` (recomendada):** no hace falta instalar nada. Es el worker con Node incluido (unos 90 MB). Se genera con `node build-exe.js` (queda en `dist/worker.exe`) y viene en `itegra-worker-windows.zip`. En los comandos de abajo, reemplazar `node worker.js` por `worker.exe`.
+  Requiere **Windows 10 u 11 de 64 bits** (el Node actual ya no corre en Windows 7/8).
+- **Con Node.js:** instalar Node.js (LTS, 18 o más nueva) desde https://nodejs.org y usar `node worker.js`.
+
+Pasos:
+
+1. Copiar la carpeta a la PC, por ejemplo a `C:\CarteleriaQ\itegra-worker`.
 3. En el panel del cliente → **Integración Itegra** → *Generar clave*. Copiar el archivo de configuración que aparece y guardarlo como `worker.config.json` dentro de la carpeta. Ajustar `rutaBase` a la carpeta de la base de Itegra (la que contiene `Datos.script`).
 4. Abrir una consola (cmd) en la carpeta y ver qué se cargaría, sin aplicar nada:
    ```
@@ -34,6 +41,8 @@ Cada cliente tiene su propia **clave de integración** (se genera en el panel, s
 6. Dejarlo funcionando solo: ejecutar `instalar-tarea.bat` **como administrador**. Queda como tarea de Windows que arranca con la PC y revisa cada pocos minutos.
 
 Para quitarlo: `desinstalar-tarea.bat`.
+
+> Windows Defender / SmartScreen puede advertir la primera vez que se abre `worker.exe` (no está firmado digitalmente): elegir «Más información» → «Ejecutar de todas formas». La tarea programada corre como SYSTEM, por lo que la carpeta de la base debe ser accesible para esa cuenta (una carpeta local lo es; una ruta de red puede requerir otra cuenta).
 
 ## Configuración (`worker.config.json`)
 
