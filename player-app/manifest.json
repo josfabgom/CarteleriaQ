@@ -1,14 +1,14 @@
 {
-  "build": 1792157133,
-  "label": "2026-10-16 13:25 UTC",
+  "build": 1792161993,
+  "label": "2026-10-16 14:46 UTC",
   "files": {
     "renderer.js": {
-      "sha256": "38f0fd0bd2b249f873fafb4473abe7da1110e1c355643e85213cdb4a0e69f2d1",
-      "size": 46446
+      "sha256": "cc00e386e2a924298772adf32ef7c26bd1af382d97b4eba5470e9e8ed616c3ef",
+      "size": 47832
     },
     "player.css": {
-      "sha256": "4313e6a3488e8c3a5252ae1e0f9a83168fd0eb0cb4a77620ecbe8ec320b474df",
-      "size": 22943
+      "sha256": "1d7f639a67d2d05e88c602cbd1c4bba9ce45408a2304d3c39b37ce082a99aa23",
+      "size": 23418
     }
   }
 }

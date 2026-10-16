@@ -1059,52 +1059,83 @@ function renderBoard(scene, transition) {
 
 const screenDataMediaSeconds = () => (currentSyncData && currentSyncData.mediaDuration) || 10;
 
-function fillBoardList(board, rows, priceList) {
-  const items = priceList.items || [];
-  for (const group of groupItems(items, priceList.groupByCategory)) {
-    if (group.title) rows.appendChild(h('div', 'b-group', group.title));
-    for (const item of group.items) {
-      const row = h('div', 'b-row' + (item.available === false ? ' unavailable' : ''));
-      row.appendChild(h('span', 'b-dot'));
-      row.appendChild(h('span', 'b-name', itemName(item)));
-      const badge = itemBadge(item);
-      if (badge) row.appendChild(h('span', 'b-tag', badge));
-      const unit = (item.unit || '').trim();
-      if (unit && !['unidad', 'u', 'un'].includes(unit.toLowerCase())) row.appendChild(h('span', 'b-unit', '/' + unit));
-      const old = Number(item.oldPrice);
-      const discounted = Number.isFinite(old) && old > Number(item.price);
-      const box = h('span', 'b-pricebox');
-      if (discounted) box.appendChild(h('span', 'b-old', formatPrice(old)));
-      box.appendChild(h('span', 'b-price' + (discounted ? ' promo' : ''), formatPrice(item.price)));
-      row.appendChild(box);
-      rows.appendChild(row);
-    }
-  }
+// La lista se muestra de a BOARD_PAGE_SIZE artículos por vez (letra grande, legible desde lejos) y, si es más larga,
+// va pasando de página sola. Las categorías se repiten al empezar cada página en la que continúan.
+const BOARD_PAGE_SIZE = 8;
+const BOARD_PAGE_MS = 8000;
 
-  // Que la lista entre: primero se achica la letra y, si aun así no cabe, se desplaza sola
-  const fit = () => {
-    if (boardScroll) { clearInterval(boardScroll); boardScroll = null; }
-    rows.scrollTop = 0;
-    let scale = 1;
-    board.style.setProperty('--bs', scale);
-    while (rows.scrollHeight > rows.clientHeight + 1 && scale > 0.5) {
-      scale = Math.round((scale - 0.05) * 100) / 100;
-      board.style.setProperty('--bs', scale);
-    }
-    if (rows.scrollHeight > rows.clientHeight + 1) {
-      let pause = 0;
-      let dir = 1;
-      boardScroll = setInterval(() => {
-        if (pause > 0) { pause--; return; }
-        rows.scrollTop += dir;
-        const atEnd = rows.scrollTop + rows.clientHeight >= rows.scrollHeight - 1;
-        if (dir === 1 && atEnd) { pause = 100; dir = -1; }
-        else if (dir === -1 && rows.scrollTop <= 0) { pause = 100; dir = 1; }
-      }, 30);
+function boardRow(item) {
+  const row = h('div', 'b-row' + (item.available === false ? ' unavailable' : ''));
+  row.appendChild(h('span', 'b-dot'));
+  row.appendChild(h('span', 'b-name', itemName(item)));
+  const badge = itemBadge(item);
+  if (badge) row.appendChild(h('span', 'b-tag', badge));
+  const unit = (item.unit || '').trim();
+  if (unit && !['unidad', 'u', 'un'].includes(unit.toLowerCase())) row.appendChild(h('span', 'b-unit', '/' + unit));
+  const old = Number(item.oldPrice);
+  const discounted = Number.isFinite(old) && old > Number(item.price);
+  const box = h('span', 'b-pricebox');
+  if (discounted) box.appendChild(h('span', 'b-old', formatPrice(old)));
+  box.appendChild(h('span', 'b-price' + (discounted ? ' promo' : ''), formatPrice(item.price)));
+  row.appendChild(box);
+  return row;
+}
+
+function fillBoardList(board, rows, priceList) {
+  // Páginas de hasta 8 artículos, cada uno con el título de su categoría
+  const entries = [];
+  for (const group of groupItems(priceList.items || [], priceList.groupByCategory)) {
+    for (const item of group.items) entries.push({ title: group.title, item });
+  }
+  // Páginas parejas (17 artículos -> 6 + 6 + 5, no 8 + 8 + 1) y nunca más de BOARD_PAGE_SIZE
+  const pageCount = Math.max(1, Math.ceil(entries.length / BOARD_PAGE_SIZE));
+  const perPage = Math.ceil(entries.length / pageCount);
+  const pages = [];
+  for (let i = 0; i < entries.length; i += perPage) pages.push(entries.slice(i, i + perPage));
+
+  const draw = (entries) => {
+    rows.innerHTML = '';
+    let lastTitle;
+    for (const e of entries) {
+      if (e.title && e.title !== lastTitle) rows.appendChild(h('div', 'b-group', e.title));
+      lastTitle = e.title;
+      rows.appendChild(boardRow(e.item));
     }
   };
-  fit();
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (rows.isConnected) fit(); });
+
+  // Un mismo tamaño de letra para todas las páginas: el que necesite la más cargada (sin bajar del 75 %)
+  const fit = () => {
+    let scale = 1;
+    board.style.setProperty('--bs', scale);
+    for (const p of pages) {
+      draw(p);
+      while (rows.scrollHeight > rows.clientHeight + 1 && scale > 0.75) {
+        scale = Math.round((scale - 0.05) * 100) / 100;
+        board.style.setProperty('--bs', scale);
+      }
+    }
+  };
+
+  const title = rows.parentElement && rows.parentElement.querySelector('.b-list-title');
+  const pager = pages.length > 1 ? h('span', 'b-pager', '') : null;
+  if (pager && title) title.appendChild(pager);
+
+  let current = 0;
+  const show = (i, animate) => {
+    current = i;
+    draw(pages[i]);
+    if (pager) pager.textContent = (i + 1) + ' / ' + pages.length;
+    if (animate) { rows.classList.remove('page-in'); void rows.offsetWidth; rows.classList.add('page-in'); }
+  };
+
+  const start = () => {
+    if (boardScroll) { clearInterval(boardScroll); boardScroll = null; }
+    fit();
+    show(Math.min(current, pages.length - 1), false);
+    if (pages.length > 1) boardScroll = setInterval(() => show((current + 1) % pages.length, true), BOARD_PAGE_MS);
+  };
+  start();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (rows.isConnected) start(); });
 }
 
 function startBoardOffers(card, offers) {
@@ -1117,7 +1148,9 @@ function startBoardOffers(card, offers) {
     photo.appendChild(makePhoto(item, 'b-offer-img', pending));
     const body = h('div', 'b-offer-body');
     body.appendChild(h('span', 'b-ribbon', 'OFERTA'));
-    body.appendChild(h('div', 'b-offer-name', itemName(item)));
+    const offerName = h('div', 'b-offer-name', itemName(item));
+    if (itemName(item).length > 26) offerName.style.fontSize = 'calc(36 * var(--u))'; // nombres largos: letra algo menor para que quepan en 3 líneas
+    body.appendChild(offerName);
     const old = Number(item.oldPrice);
     if (Number.isFinite(old) && old > Number(item.price)) body.appendChild(h('div', 'b-offer-old', 'Antes ' + formatPrice(old)));
     const price = h('div', 'b-offer-price', formatPrice(item.price));
