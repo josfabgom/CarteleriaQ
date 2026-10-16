@@ -1,0 +1,32 @@
+<!--
+  Configuracion del servicio de Windows (WinSW 2.12). Debe llamarse igual que CarteleriaQItegraWorker.exe
+  (que es una copia de winsw.exe) y estar en la misma carpeta que worker.exe y worker.config.json.
+  %BASE% es la carpeta donde estan estos archivos.
+-->
+<service>
+  <id>CarteleriaQItegraWorker</id>
+  <name>CarteleriaQ Itegra Worker</name>
+  <description>Lee la base de Itegra y sube los articulos y precios a CarteleriaQ en la nube.</description>
+
+  <executable>%BASE%\worker.exe</executable>
+  <arguments>--config "%BASE%\worker.config.json"</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+
+  <!-- Arranca con Windows (unos segundos despues, cuando ya hay red) sin necesidad de iniciar sesion -->
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+
+  <!-- Si el programa se cierra por un error, Windows lo reinicia -->
+  <onfailure action="restart" delay="1 min"/>
+  <onfailure action="restart" delay="5 min"/>
+  <onfailure action="restart" delay="10 min"/>
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>15 sec</stoptimeout>
+
+  <!-- Lo que el programa muestra por pantalla queda en la carpeta logs (se rota solo) -->
+  <logpath>%BASE%\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>2048</sizeThreshold>
+    <keepFiles>3</keepFiles>
+  </log>
+</service>

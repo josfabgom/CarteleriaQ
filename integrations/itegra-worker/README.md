@@ -38,13 +38,24 @@ Pasos:
    ```
    node worker.js --aplicar
    ```
-6. Dejarlo funcionando solo: hacer doble clic en `instalar-tarea.bat` (pide permisos de administrador: aceptar el aviso de Windows). Queda como tarea de Windows que corre en segundo plano como SYSTEM: arranca con la PC sin necesidad de iniciar sesión, no tiene límite de tiempo (las tareas comunes se cortan a las 72 h), sigue a batería y se reinicia sola si se cierra por un error. Al terminar muestra el estado y las últimas líneas de `worker.log`.
+6. Dejarlo funcionando solo como **servicio de Windows**: doble clic en `instalar-servicio.bat` (pide permisos de administrador: aceptar el aviso de Windows). Queda instalado el servicio **«CarteleriaQ Itegra Worker»**, que se ve en `services.msc`: arranca con la PC sin necesidad de iniciar sesión (cuenta SYSTEM), se reinicia solo si falla (al minuto, a los 5 y a los 10) y se puede iniciar/detener desde ahí. Al terminar muestra el estado y las últimas líneas de `worker.log`. Si el worker estaba instalado como tarea programada (versión anterior) o abierto a mano, el instalador lo reemplaza.
 
-Para quitarlo: `desinstalar-tarea.bat`.
+Para quitarlo: `desinstalar-servicio.bat` (como administrador, lo pide solo).
+
+Comandos útiles del servicio (PowerShell como administrador):
+
+```
+Get-Service CarteleriaQItegraWorker            # estado
+Stop-Service CarteleriaQItegraWorker           # detener
+Start-Service CarteleriaQItegraWorker          # iniciar
+Restart-Service CarteleriaQItegraWorker        # reiniciar (por ejemplo tras cambiar worker.config.json)
+```
+
+El servicio se instala con **WinSW 2.12.0** (https://github.com/winsw/winsw, licencia MIT), incluido como `winsw.exe` (SHA-256 `923111c7142b3dc783a3c722b19b8a21bcb78222d7a136ac33f0ca8a29f4cb66`). Se copia como `CarteleriaQItegraWorker.exe` y se configura con `CarteleriaQItegraWorker.xml`: ambos archivos deben quedar junto a `worker.exe`. Lo que el programa imprime por pantalla queda en la carpeta `logs`.
 
 Para **forzar una actualización ahora** (sin esperar los 5 minutos): doble clic en `aplicar-ahora.bat`. Ejecuta `worker.exe --aplicar`, muestra el resultado y los últimos cambios de `actualizaciones.log`.
 
-> Windows Defender / SmartScreen puede advertir la primera vez que se abre `worker.exe` (no está firmado digitalmente): elegir «Más información» → «Ejecutar de todas formas». La tarea programada corre como SYSTEM, por lo que la carpeta de la base debe ser accesible para esa cuenta (una carpeta local lo es; una ruta de red puede requerir otra cuenta).
+> Windows Defender / SmartScreen puede advertir la primera vez que se abre `worker.exe` (no está firmado digitalmente): elegir «Más información» → «Ejecutar de todas formas». El servicio corre como SYSTEM, por lo que la carpeta de la base debe ser accesible para esa cuenta (una carpeta local lo es; una ruta de red puede requerir otra cuenta).
 
 ## Configuración (`worker.config.json`)
 

@@ -96,7 +96,7 @@ Si cerrás el recuadro sin copiarla, hay que revocarla y generar otra. Tratala c
 <h2>Paso 2. En la PC de Itegra: copiar el programa</h2>
 <ol class="steps">
   <li>Copiá <code>itegra-worker-windows.zip</code> a la PC (pendrive, correo o descarga).</li>
-  <li>Creá una carpeta, por ejemplo <code>C:\CarteleriaQ\worker</code>, y descomprimí el zip adentro. Deben quedar estos archivos: <code>worker.exe</code>, <code>worker.config.example.json</code>, <code>instalar-tarea.bat</code>, <code>desinstalar-tarea.bat</code> y <code>LEEME.md</code>.</li>
+  <li>Creá una carpeta, por ejemplo <code>C:\CarteleriaQ\worker</code>, y descomprimí el zip adentro. Deben quedar, entre otros: <code>worker.exe</code>, <code>winsw.exe</code>, <code>CarteleriaQItegraWorker.xml</code>, <code>worker.config.example.json</code>, <code>instalar-servicio.bat</code>, <code>desinstalar-servicio.bat</code>, <code>aplicar-ahora.bat</code> y <code>LEEME.md</code>.</li>
 </ol>
 
 <h2>Paso 3. Crear el archivo de configuración</h2>
@@ -129,13 +129,13 @@ No se aplicó nada. Si el negocio es el correcto, ejecutá ...</pre></li>
   <li>En el panel, abrí <b>Catálogo de Artículos</b>: los artículos aparecen con su categoría, precio y unidad.</li>
 </ol>
 
-<h2>Paso 6. Dejarlo funcionando solo</h2>
+<h2>Paso 6. Dejarlo funcionando solo (servicio de Windows)</h2>
 <ol class="steps">
-  <li>En la carpeta del worker, clic derecho sobre <code>instalar-tarea.bat</code> → <b>Ejecutar como administrador</b>.</li>
-  <li>Debe decir que la tarea se creó con éxito y que el worker quedó funcionando. Se instala como tarea programada de Windows llamada <b>CarteleriaQ Itegra Worker</b>: arranca con la PC y revisa cada 5 minutos.</li>
+  <li>En la carpeta del worker, hacé doble clic en <code>instalar-servicio.bat</code>. Pide permisos de administrador solo: aceptá el aviso de Windows.</li>
+  <li>Al terminar debe mostrar <b>Estado: Running</b> y el mensaje <b>LISTO</b>. Queda instalado el servicio <b>CarteleriaQ Itegra Worker</b>: arranca con la PC sin necesidad de iniciar sesión, se reinicia solo si falla (al minuto, a los 5 y a los 10) y revisa los cambios cada 5 minutos.</li>
 </ol>
 <div class="note"><b>Para tener en cuenta</b>
-La tarea corre como cuenta SYSTEM. Si la base de Itegra está en una carpeta local (C:\...), no hay problema. Si está en una carpeta compartida de otra PC, puede que SYSTEM no tenga acceso: en ese caso conviene instalar el worker en la PC que tiene la base.</div>
+El servicio corre como cuenta SYSTEM. Si la base de Itegra está en una carpeta local (C:\...), no hay problema. Si está en una carpeta compartida de otra PC, puede que SYSTEM no tenga acceso: en ese caso conviene instalar el worker en la PC que tiene la base.</div>
 
 <h1 class="pb">Verificación y uso diario</h1>
 
@@ -145,7 +145,7 @@ La tarea corre como cuenta SYSTEM. Si la base de Itegra está en una carpeta loc
   <tr><td>Panel → Integración Itegra</td><td>La clave figura <b>Conectada</b> (señal de los últimos 15 minutos), «Atada a una base de Itegra» y el último resultado (cuántos nuevos, actualizados y sin cambios).</td></tr>
   <tr><td>Archivo <code>worker.log</code> (en la carpeta del worker)</td><td>Una línea por revisión: «Sin cambios» o «Sincronizado con...». Se rota solo a los 2 MB.</td></tr>
   <tr><td>Archivo <code>actualizaciones.log</code> (misma carpeta)</td><td>El detalle de <b>qué se actualizó</b>: una línea por artículo, por ejemplo <code>PRECIO 2 CARRE DE CERDO BARBIAN: $26.600,01 -&gt; $35.000,00</code>. También registra artículos nuevos, bajas, cambios de nombre y de unidad.</td></tr>
-  <tr><td>Programador de tareas de Windows (<code>taskschd.msc</code>)</td><td>La tarea «CarteleriaQ Itegra Worker» con estado <i>En ejecución</i>.</td></tr>
+  <tr><td>Servicios de Windows (<code>services.msc</code>)</td><td>El servicio <b>CarteleriaQ Itegra Worker</b> con estado <i>En ejecución</i> e inicio <i>Automático</i>. También se ve como <code>worker.exe</code> en el Administrador de tareas → Detalles.</td></tr>
   <tr><td>Prueba real</td><td>Cambiá el precio de un artículo en Itegra. A los pocos minutos debe cambiar en el Catálogo del panel y en las TVs.</td></tr>
 </table>
 
@@ -180,27 +180,29 @@ La tarea corre como cuenta SYSTEM. Si la base de Itegra está en una carpeta loc
   <tr><td><code>La clave ... no es válida o fue revocada</code></td><td>Generá una clave nueva en el panel y actualizá <code>worker.config.json</code>.</td></tr>
   <tr><td><code>Esta clave ya está vinculada a otra base de Itegra</code></td><td>Cambió la base (PC nueva, Itegra reinstalado). En el panel: <b>Desvincular base</b> en esa clave y volver a ejecutar.</td></tr>
   <tr><td><code>Parece un error de lectura</code></td><td>Itegra puede estar importando datos en ese momento. Esperá y reintentá; si el cambio es real, usá <code>--forzar</code>.</td></tr>
-  <tr><td>Panel: «Sin señal»</td><td>La PC está apagada o sin internet, o la tarea no está corriendo (revisá <code>taskschd.msc</code> y <code>worker.log</code>).</td></tr>
+  <tr><td>Panel: «Sin señal»</td><td>La PC está apagada o sin internet, o el servicio no está en ejecución (revisá <code>services.msc</code>, <code>worker.log</code> y la carpeta <code>logs</code>).</td></tr>
   <tr><td>No se pudo conectar / tiempo agotado</td><td>Revisá internet, y que el antivirus o el firewall no bloqueen <code>worker.exe</code> hacia <code>carteleriaq.soporteq.tech</code> (puerto 443).</td></tr>
   <tr><td>Los precios no cambian</td><td>Confirmá que Itegra efectivamente guardó el cambio. Si <code>rutaBase</code> apunta a una copia vieja del <code>.script</code>, no verá los cambios nuevos.</td></tr>
 </table>
 
 <h2>Mantenimiento</h2>
 <h3>Cambiar la clave o la configuración</h3>
-<p>Editá <code>worker.config.json</code>. El cambio se toma en la próxima ejecución; para aplicarlo ya, ejecutá en una consola de administrador: <code>schtasks /End /TN "CarteleriaQ Itegra Worker"</code> y luego <code>schtasks /Run /TN "CarteleriaQ Itegra Worker"</code>.</p>
+<p>Editá <code>worker.config.json</code> y reiniciá el servicio para que tome el cambio: en <code>services.msc</code> clic derecho → <b>Reiniciar</b>, o en PowerShell como administrador: <code>Restart-Service CarteleriaQItegraWorker</code>.</p>
 <h3>Actualizar el programa</h3>
 <ol>
-  <li>Detené la tarea: <code>schtasks /End /TN "CarteleriaQ Itegra Worker"</code></li>
+  <li>Detené el servicio: <code>Stop-Service CarteleriaQItegraWorker</code> (PowerShell como administrador)</li>
   <li>Reemplazá <code>worker.exe</code> por el nuevo (no toques <code>worker.config.json</code> ni <code>estado.json</code>).</li>
-  <li>Iniciá la tarea: <code>schtasks /Run /TN "CarteleriaQ Itegra Worker"</code></li>
+  <li>Iniciá el servicio: <code>Start-Service CarteleriaQItegraWorker</code></li>
 </ol>
 <h3>Desinstalar</h3>
-<p>Ejecutá <code>desinstalar-tarea.bat</code> como administrador y borrá la carpeta. En el panel, <b>Revocar</b> la clave de esa PC.</p>
+<p>Hacé doble clic en <code>desinstalar-servicio.bat</code> (pide permisos solo) y borrá la carpeta. En el panel, <b>Revocar</b> la clave de esa PC.</p>
 <h3>Si la PC se pierde o la clave se filtra</h3>
 <p>En el panel → Integración Itegra → <b>Revocar</b>. El worker deja de funcionar al instante. Después se genera otra clave para la nueva instalación.</p>
 
 <h2>Notas para el técnico</h2>
 <ul>
+  <li>El servicio se instala con <b>WinSW 2.12.0</b> (herramienta de código abierto, licencia MIT), que viene como <code>winsw.exe</code> en el zip. Se copia como <code>CarteleriaQItegraWorker.exe</code> y se configura con <code>CarteleriaQItegraWorker.xml</code> (ambos deben quedar junto a <code>worker.exe</code>). Lo que el programa imprime queda en la carpeta <code>logs</code>.</li>
+  <li>Si antes estaba instalado como tarea programada, <code>instalar-servicio.bat</code> la reemplaza solo.</li>
   <li>Los tipos de artículo de Itegra: <b>P</b> = pesable (se sube como <code>kg</code>), <b>N</b> = por unidad (<code>unidad</code>). Los tipos <b>R</b> y <b>X</b> no se suben (se puede cambiar con <code>tiposDeArticulo</code> en la configuración).</li>
   <li>Los precios de Itegra a veces traen centavos «de ruido» (por ejemplo $26.600,01). Se suben tal cual.</li>
   <li>Si el cliente <b>ya cargó su catálogo a mano</b> (por ejemplo, importando un archivo), esos artículos figurarán como «omitidos por conflicto» y el worker no los va a actualizar. Hay que acordar con soporte cómo adoptarlos antes de activar el worker.</li>
