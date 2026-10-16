@@ -35,6 +35,7 @@ const configPath = path.resolve(option('--config') || path.join(appDir, 'worker.
 const baseDir = path.dirname(configPath);
 const statePath = path.join(baseDir, 'estado.json');
 const logPath = path.join(baseDir, 'worker.log');
+const changesPath = path.join(baseDir, 'actualizaciones.log'); // qué artículos cambiaron en cada sincronización
 
 // ---------- Registro ----------
 function log(msg) {
@@ -61,6 +62,57 @@ function loadConfig() {
   if (!cfg.claveIntegracion.startsWith('itg_')) throw new Error('"claveIntegracion" no es válida: debe empezar con itg_ (se genera en el panel, sección Integración).');
   if (!cfg.rutaBase) throw new Error('Falta "rutaBase": la carpeta (o el archivo Datos.script) de la base de Itegra.');
   return cfg;
+}
+
+// ---------- Registro de actualizaciones (qué cambió) ----------
+const stamp = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
+const money = (n) => { const [i, d] = Number(n).toFixed(2).split('.'); return '$' + i.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d; };
+
+function appendChanges(lines) {
+  try {
+    if (fs.existsSync(changesPath) && fs.statSync(changesPath).size > 2 * 1024 * 1024) fs.renameSync(changesPath, changesPath + '.1');
+    fs.appendFileSync(changesPath, lines.join('\n') + '\n');
+  } catch { /* si no se puede escribir, se sigue igual */ }
+}
+
+// Compara lo enviado ahora con lo enviado la vez anterior. prev: { codigo: [nombre, precio, unidad] }
+function diffItems(prev, items) {
+  const out = [];
+  const seen = new Set();
+  for (const it of items) {
+    seen.add(it.code);
+    const p = prev[it.code];
+    if (!p) { out.push({ tipo: 'NUEVO', code: it.code, texto: `${it.name}: ${money(it.price)}${it.unit ? ' / ' + it.unit : ''}` }); continue; }
+    if (Math.abs(Number(p[1]) - it.price) >= 0.005) out.push({ tipo: 'PRECIO', code: it.code, texto: `${it.name}: ${money(p[1])} -> ${money(it.price)}` });
+    if (p[0] !== it.name) out.push({ tipo: 'NOMBRE', code: it.code, texto: `${p[0]} -> ${it.name}` });
+    if (it.unit && p[2] && p[2] !== it.unit) out.push({ tipo: 'UNIDAD', code: it.code, texto: `${it.name}: ${p[2]} -> ${it.unit}` });
+  }
+  for (const code of Object.keys(prev)) if (!seen.has(code)) out.push({ tipo: 'BAJA', code, texto: `${prev[code][0]} (ya no está en Itegra: queda sin stock)` });
+  return out;
+}
+
+function logApplied(prevItems, items, serverData) {
+  const ts = stamp();
+  const business = serverData.business;
+  if (prevItems === undefined) {
+    appendChanges([`${ts}  PRIMERA CARGA: ${items.length} artículos subidos a "${business}" (nuevos ${serverData.created}, actualizados ${serverData.updated})`, '']);
+    return;
+  }
+  if (prevItems === null) { // el estado viene de una versión anterior que no guardaba el detalle
+    appendChanges([`${ts}  SINCRONIZADO con "${business}": ${describe(serverData)}  (desde acá se registra el detalle de cada cambio)`, '']);
+    return;
+  }
+  const skip = new Set((serverData.conflictList || []).map((c) => c.code));
+  const changes = diffItems(prevItems, items).filter((c) => !skip.has(c.code));
+  const counts = changes.reduce((a, c) => { a[c.tipo] = (a[c.tipo] || 0) + 1; return a; }, {});
+  if (!changes.length && !serverData.hidden && !serverData.restored && !serverData.conflicts) return; // nada para registrar
+  const resumen = Object.entries(counts).map(([t, n]) => `${n} ${t.toLowerCase()}`).join(', ') || 'sin cambios en los artículos';
+  const lines = [`${ts}  SINCRONIZACIÓN en "${business}": ${resumen}${serverData.conflicts ? ` · omitidos por conflicto: ${serverData.conflicts}` : ''}${serverData.hidden ? ` · sin stock: ${serverData.hidden}` : ''}`];
+  const MAX = 300;
+  for (const c of changes.slice(0, MAX)) lines.push(`   ${c.tipo.padEnd(7)} ${c.code.padStart(5)}  ${c.texto}`);
+  if (changes.length > MAX) lines.push(`   ... y ${changes.length - MAX} más`);
+  lines.push('');
+  appendChanges(lines);
 }
 
 function loadState() {
@@ -90,9 +142,11 @@ const DAY = 24 * 60 * 60 * 1000;
 const describe = (d) => `nuevos ${d.created}, actualizados ${d.updated}, sin cambios ${d.unchanged}, sin stock ${d.hidden}${d.restored ? `, repuestos ${d.restored}` : ''}${d.conflicts ? `, omitidos por conflicto ${d.conflicts}` : ''}`;
 
 // ---------- Una revisión ----------
+let lastSource = null;
 async function runOnce(cfg) {
   const state = loadState();
   const { fingerprint, rows, logLines, files } = readProducts(cfg.rutaBase);
+  if (files.script !== lastSource) { log(`Leyendo la base desde: ${files.script}`); lastSource = files.script; }
   const { items, skipped } = toItems(rows, { types: cfg.tipos });
   const omitidos = skipped.tipo + skipped.sinNombre + skipped.precioInvalido;
 
@@ -129,7 +183,9 @@ async function runOnce(cfg) {
     if (!confirmado || flag('--previsualizar')) log('No se aplicó nada. Si el negocio es el correcto, ejecutá el worker con --aplicar (node worker.js --aplicar, o worker.exe --aplicar).');
     return { ok: true };
   }
-  saveState({ confirmado: true, lastHash: hash, lastCount: items.length, lastFullAt: full ? Date.now() : state.lastFullAt, lastSyncAt: Date.now() });
+  // state.items solo existe desde que se registran los cambios: sin él, no se puede comparar (null = estado viejo, undefined = primera carga)
+  logApplied(state.items ? state.items : (state.lastHash ? null : undefined), items, res.data);
+  saveState({ confirmado: true, lastHash: hash, lastCount: items.length, lastFullAt: full ? Date.now() : state.lastFullAt, lastSyncAt: Date.now(), items: Object.fromEntries(items.map((i) => [i.code, [i.name, i.price, i.unit]])) });
   return { ok: true };
 }
 

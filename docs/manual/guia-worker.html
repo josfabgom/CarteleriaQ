@@ -144,6 +144,7 @@ La tarea corre como cuenta SYSTEM. Si la base de Itegra está en una carpeta loc
   <tr><th style="width:34%">Dónde</th><th>Qué tenés que ver</th></tr>
   <tr><td>Panel → Integración Itegra</td><td>La clave figura <b>Conectada</b> (señal de los últimos 15 minutos), «Atada a una base de Itegra» y el último resultado (cuántos nuevos, actualizados y sin cambios).</td></tr>
   <tr><td>Archivo <code>worker.log</code> (en la carpeta del worker)</td><td>Una línea por revisión: «Sin cambios» o «Sincronizado con...». Se rota solo a los 2 MB.</td></tr>
+  <tr><td>Archivo <code>actualizaciones.log</code> (misma carpeta)</td><td>El detalle de <b>qué se actualizó</b>: una línea por artículo, por ejemplo <code>PRECIO 2 CARRE DE CERDO BARBIAN: $26.600,01 -&gt; $35.000,00</code>. También registra artículos nuevos, bajas, cambios de nombre y de unidad.</td></tr>
   <tr><td>Programador de tareas de Windows (<code>taskschd.msc</code>)</td><td>La tarea «CarteleriaQ Itegra Worker» con estado <i>En ejecución</i>.</td></tr>
   <tr><td>Prueba real</td><td>Cambiá el precio de un artículo en Itegra. A los pocos minutos debe cambiar en el Catálogo del panel y en las TVs.</td></tr>
 </table>
@@ -161,11 +162,12 @@ La tarea corre como cuenta SYSTEM. Si la base de Itegra está en una carpeta loc
 <h2>Comandos útiles</h2>
 <table>
   <tr><th style="width:36%">Comando</th><th>Para qué</th></tr>
-  <tr><td><code>worker.exe --previsualizar</code></td><td>Ver qué cambiaría, sin aplicar nada.</td></tr>
-  <tr><td><code>worker.exe --aplicar</code></td><td>Primera carga real.</td></tr>
-  <tr><td><code>worker.exe --una-vez</code></td><td>Una revisión manual ahora mismo.</td></tr>
-  <tr><td><code>worker.exe --forzar</code></td><td>Salta las protecciones (solo si el cambio grande es real).</td></tr>
-  <tr><td><code>worker.exe --ayuda</code></td><td>Muestra las opciones.</td></tr>
+  <tr><td><code>.worker.exe --previsualizar</code></td><td>Ver qué cambiaría, sin aplicar nada.</td></tr>
+  <tr><td><code>.worker.exe --aplicar</code></td><td>Primera carga real.</td></tr>
+  <tr><td><code>.worker.exe --una-vez</code></td><td>Una revisión manual ahora mismo.</td></tr>
+  <tr><td><code>aplicar-ahora.bat</code></td><td>Doble clic: sube los cambios de Itegra ahora mismo (hace <code>worker.exe --aplicar</code>) y muestra los últimos cambios registrados.</td></tr>
+  <tr><td><code>.worker.exe --forzar</code></td><td>Salta las protecciones (solo si el cambio grande es real).</td></tr>
+  <tr><td><code>.worker.exe --ayuda</code></td><td>Muestra las opciones.</td></tr>
 </table>
 
 <h2>Problemas frecuentes</h2>

@@ -21,7 +21,7 @@ Cada cliente tiene su propia **clave de integración** (se genera en el panel, s
 
 Hay dos formas; el resto de los pasos es igual:
 
-- **Con `worker.exe` (recomendada):** no hace falta instalar nada. Es el worker con Node incluido (unos 90 MB). Se genera con `node build-exe.js` (queda en `dist/worker.exe`) y viene en `itegra-worker-windows.zip`. En los comandos de abajo, reemplazar `node worker.js` por `worker.exe`.
+- **Con `worker.exe` (recomendada):** no hace falta instalar nada. Es el worker con Node incluido (unos 90 MB). Se genera con `node build-exe.js` (queda en `dist/worker.exe`) y viene en `itegra-worker-windows.zip`. En los comandos de abajo, reemplazar `node worker.js` por `.\worker.exe` (en PowerShell hay que escribir el `.\` delante).
   Requiere **Windows 10 u 11 de 64 bits** (el Node actual ya no corre en Windows 7/8).
 - **Con Node.js:** instalar Node.js (LTS, 18 o más nueva) desde https://nodejs.org y usar `node worker.js`.
 
@@ -38,9 +38,11 @@ Pasos:
    ```
    node worker.js --aplicar
    ```
-6. Dejarlo funcionando solo: ejecutar `instalar-tarea.bat` **como administrador**. Queda como tarea de Windows que arranca con la PC y revisa cada pocos minutos.
+6. Dejarlo funcionando solo: hacer doble clic en `instalar-tarea.bat` (pide permisos de administrador: aceptar el aviso de Windows). Queda como tarea de Windows que corre en segundo plano como SYSTEM: arranca con la PC sin necesidad de iniciar sesión, no tiene límite de tiempo (las tareas comunes se cortan a las 72 h), sigue a batería y se reinicia sola si se cierra por un error. Al terminar muestra el estado y las últimas líneas de `worker.log`.
 
 Para quitarlo: `desinstalar-tarea.bat`.
+
+Para **forzar una actualización ahora** (sin esperar los 5 minutos): doble clic en `aplicar-ahora.bat`. Ejecuta `worker.exe --aplicar`, muestra el resultado y los últimos cambios de `actualizaciones.log`.
 
 > Windows Defender / SmartScreen puede advertir la primera vez que se abre `worker.exe` (no está firmado digitalmente): elegir «Más información» → «Ejecutar de todas formas». La tarea programada corre como SYSTEM, por lo que la carpeta de la base debe ser accesible para esa cuenta (una carpeta local lo es; una ruta de red puede requerir otra cuenta).
 
@@ -70,7 +72,14 @@ Hasta que se ejecuta `--aplicar` por primera vez, el worker **solo previsualiza*
 
 ## Archivos que genera (junto a la configuración)
 
-- `worker.log` — registro de lo que hizo (se rota solo a los 2 MB).
+- `actualizaciones.log` — **qué se actualizó** en cada sincronización, artículo por artículo (se rota solo a los 2 MB). Ejemplo:
+  ```
+  2026-10-16 09:40:12  SINCRONIZACIÓN en "soporteq": 1 precio, 1 nuevo
+     PRECIO      2  CARRE DE CERDO BARBIAN: $26.600,01 -> $35.000,00
+     NUEVO      11  ZAPALLO NEGRO X KG: $800,00 / kg
+  ```
+  Tipos de línea: `PRECIO`, `NUEVO`, `BAJA` (ya no está en Itegra: queda sin stock), `NOMBRE` y `UNIDAD`. La primera carga se registra en una sola línea. Si no hubo cambios no se escribe nada.
+- `worker.log` — registro de lo que hizo el programa (revisiones, errores; se rota solo a los 2 MB).
 - `estado.json` — recuerda si ya se confirmó la primera carga y qué envió por última vez.
 
 ## Si algo falla
@@ -84,6 +93,8 @@ Hasta que se ejecuta `--aplicar` por primera vez, el worker **solo previsualiza*
 | Sin señal en el panel | La PC está apagada o sin internet. Al volver la conexión se pone al día sola. |
 
 ## Importante: la base de Itegra
+
+**Itegra instalado en `Program Files`:** si Itegra corre sin permisos de administrador, Windows desvía lo que escribe a `C:\Users\<usuario>\AppData\Local\VirtualStore\Program Files (x86)\...\Datos`. Ahí queda la base con los cambios y en la carpeta original queda una copia vieja. El worker lo resuelve solo: mira la carpeta indicada en `rutaBase` y su copia en `VirtualStore`, y usa el archivo más reciente (`Datos.script` o `Datos.script.new`, más `Datos.log`). Al iniciar y cada vez que cambia el archivo de origen, el log dice `Leyendo la base desde: ...`.
 
 Itegra guarda los cambios recientes en `Datos.log` hasta que cierra o guarda la base en `Datos.script`. Por eso `rutaBase` debe apuntar a la **carpeta completa** (con `Datos.script` y `Datos.log`), no a una copia suelta del `.script`: con una copia puede quedar desactualizado.
 

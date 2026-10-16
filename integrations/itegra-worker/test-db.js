@@ -64,6 +64,35 @@ check('aplica la baja', !byCode['3']);
 check('ignora cambios de artículos que no existen', !byCode['999']);
 check('también se puede indicar el archivo .script', readProducts(path.join(tmp, 'Datos.script')).rows.length === db.rows.length);
 
+console.log('Carpeta VirtualStore de Windows (Itegra en Program Files)');
+{
+  const real = fs.mkdtempSync(path.join(os.tmpdir(), 'itegra-real-'));
+  const virt = fs.mkdtempSync(path.join(os.tmpdir(), 'itegra-virt-'));
+  const old = SCRIPT.replace('12900.00', '1.00');
+  fs.writeFileSync(path.join(real, 'Datos.script'), old);
+  const priceOf = (target, opts) => toItems(readProducts(target, opts).rows).items.find((i) => i.code === '1').price;
+  const past = new Date(Date.now() - 60000);
+  fs.utimesSync(path.join(real, 'Datos.script'), past, past);
+
+  check('sin copia virtual usa la carpeta indicada', priceOf(real, { extraDirs: [] }) === 1);
+  fs.writeFileSync(path.join(virt, 'Datos.script.new'), SCRIPT.replace('12900.00', '35000.00'));
+  check('usa Datos.script.new de VirtualStore si es más reciente', priceOf(real, { extraDirs: [virt] }) === 35000);
+  fs.writeFileSync(path.join(virt, 'Datos.log'), '/*C1*/UPDATE PLUS SET PRECIO=36000.00 WHERE NROPLU=1\n');
+  check('y le aplica su .log', priceOf(real, { extraDirs: [virt] }) === 36000);
+  const newer = new Date(Date.now() + 60000);
+  fs.utimesSync(path.join(real, 'Datos.script'), newer, newer);
+  fs.rmSync(path.join(virt, 'Datos.log'));
+  check('si la carpeta original es la más reciente, usa esa', priceOf(real, { extraDirs: [virt] }) === 1);
+  fs.writeFileSync(path.join(virt, 'Datos.script'), SCRIPT.replace('12900.00', '777.00'));
+  const newest = new Date(Date.now() + 120000);
+  fs.utimesSync(path.join(virt, 'Datos.script'), newest, newest);
+  check('también usa Datos.script de VirtualStore cuando Itegra ya cerró y guardó', priceOf(real, { extraDirs: [virt] }) === 777);
+  fs.writeFileSync(path.join(virt, 'Datos.script.new'), '');
+  check('ignora un archivo vacío (escritura en curso)', priceOf(real, { extraDirs: [virt] }) === 777);
+  fs.rmSync(real, { recursive: true, force: true });
+  fs.rmSync(virt, { recursive: true, force: true });
+}
+
 console.log('Errores');
 let msg = '';
 try { readProducts(path.join(tmp, 'noexiste')); } catch (e) { msg = e.message; }

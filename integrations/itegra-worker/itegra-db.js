@@ -62,16 +62,51 @@ function parseUpdate(line) {
   return { changes, nroplu: m[2] };
 }
 
-function resolveFiles(target) {
-  const isScript = /\.script$/i.test(target);
-  const script = isScript ? target : path.join(target, 'Datos.script');
-  const log = script.replace(/\.script$/i, '.log');
-  return { script, log };
+// Cuando Itegra está instalado en "Program Files" y corre sin permisos de administrador, Windows desvía lo que
+// escribe a la carpeta VirtualStore de cada usuario. Ahí queda la base con los cambios y en la carpeta original
+// queda una copia vieja. Por eso se miran las dos y se usa la más reciente.
+function virtualStoreDirs(dir) {
+  const found = [];
+  if (process.platform !== 'win32') return found;
+  const m = /^([A-Za-z]):[\\/](.*)$/.exec(path.resolve(dir));
+  if (!m) return found;
+  const usersRoot = `${m[1]}:\\Users`;
+  let users = [];
+  try { users = fs.readdirSync(usersRoot); } catch { return found; }
+  for (const u of users) {
+    const p = path.join(usersRoot, u, 'AppData', 'Local', 'VirtualStore', m[2]);
+    try { if (fs.statSync(p).isDirectory()) found.push(p); } catch { /* no existe */ }
+  }
+  return found;
 }
 
-function readProducts(target) {
-  const { script, log } = resolveFiles(target);
-  if (!fs.existsSync(script)) throw new Error(`No encuentro la base de Itegra: ${script}`);
+// Elige el archivo de base más reciente entre la carpeta indicada y su(s) VirtualStore.
+// Itegra (HSQLDB) deja la foto de la base en Datos.script o, mientras trabaja, en Datos.script.new.
+function resolveFiles(target, extraDirs) {
+  const isScript = /\.script$/i.test(target);
+  const dir = isScript ? path.dirname(target) : target;
+  const base = isScript ? path.basename(target).replace(/\.script$/i, '') : 'Datos';
+  const dirs = [dir, ...(extraDirs || virtualStoreDirs(dir))];
+
+  const candidates = [];
+  for (const d of dirs) {
+    for (const ext of ['.script', '.script.new']) {
+      const file = path.join(d, base + ext);
+      try {
+        const st = fs.statSync(file);
+        if (st.isFile() && st.size > 0) candidates.push({ script: file, log: path.join(d, base + '.log'), mtime: st.mtimeMs });
+      } catch { /* no existe */ }
+    }
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => b.mtime - a.mtime);
+  return candidates[0];
+}
+
+function readProducts(target, { extraDirs } = {}) {
+  const chosen = resolveFiles(target, extraDirs);
+  if (!chosen) throw new Error(`No encuentro la base de Itegra en: ${target}`);
+  const { script, log } = chosen;
   const text = fs.readFileSync(script, 'utf8');
 
   const fingerprint = (text.match(/^SET DATABASE UNIQUE NAME (\S+)/m) || [])[1] || null;
