@@ -126,6 +126,26 @@ async function call(method, url, { token, body } = {}) {
   const pm = byCode(await products(A.token), '77');
   check('un artículo cargado a mano no se pisa y se avisa', conf.data.conflicts === 1 && conf.data.conflictList[0].code === '77' && pm.name === 'Mi artículo propio' && pm.price === 100 && manual.id === pm.id);
 
+  console.log('Adoptar artículos ya cargados a mano');
+  // 25 artículos cargados a mano (como un catálogo importado antes de usar el worker)
+  for (let i = 0; i < 25; i++) await call('POST', '/api/products', { token: A.token, body: { internalCode: `M${i}`, name: `Manual ${i}`, price: 10 + i, category: 'Mi categoría', oldPrice: 50 + i, badge: 'NUEVO' } });
+  const manualItems = Array.from({ length: 25 }, (_, i) => ({ code: `M${i}`, name: `ARTICULO ITEGRA ${i}`, price: 100 + i, unit: 'kg' }));
+  const noAdopt = await sync(KEY, { mode: 'apply', fingerprint: FP, items: [...items2, ...manualItems] });
+  check('sin adoptar: los 25 quedan como conflicto', noAdopt.data.conflicts === 25 && noAdopt.data.adopted === 0);
+  check('el servidor devuelve TODOS los códigos en conflicto (no solo 20)', noAdopt.data.conflictCodes.length === 25 && noAdopt.data.conflictList.length === 20);
+  check('y no cambió ninguno', byCode(await products(A.token), 'M3').price === 13 && byCode(await products(A.token), 'M3').name === 'Manual 3');
+  const adoptPrev = await sync(KEY, { mode: 'preview', fingerprint: FP, adopt: true, items: [...items2, ...manualItems] });
+  check('la vista previa cuenta cuántos adoptaría, sin escribir', adoptPrev.data.adopted === 25 && adoptPrev.data.conflicts === 0 && adoptPrev.data.adoptedSample.length === 8 && byCode(await products(A.token), 'M3').price === 13);
+  const adoptNow = await sync(KEY, { mode: 'apply', fingerprint: FP, adopt: true, items: [...items2, ...manualItems] });
+  const m3 = byCode(await products(A.token), 'M3');
+  check('con adopt:true los adopta', adoptNow.data.adopted === 25 && adoptNow.data.conflicts === 0);
+  check('Itegra pasa a mandar sobre nombre, precio y unidad', m3.name === 'Articulo Itegra 3' && m3.price === 103 && m3.unit === 'kg');
+  check('la categoría, el precio anterior y la etiqueta del negocio se conservan', m3.category === 'Mi categoría' && m3.oldPrice === 53 && m3.badge === 'NUEVO');
+  const afterAdopt = await sync(KEY, { mode: 'apply', fingerprint: FP, items: [...items2, ...manualItems.map((i) => (i.code === 'M3' ? { ...i, price: 999 } : i))] });
+  check('después de adoptados se actualizan solos, sin pedir adopt de nuevo', afterAdopt.data.updated === 1 && afterAdopt.data.conflicts === 0 && byCode(await products(A.token), 'M3').price === 999);
+  check('el artículo manual que no se adoptó (77) sigue intacto', byCode(await products(A.token), '77').name === 'Mi artículo propio');
+  for (const p of (await products(A.token)).filter((x) => /^M[0-9]+$/.test(x.internalCode))) await call('DELETE', `/api/products/${p.id}`, { token: A.token });
+
   console.log('Artículos que desaparecen');
   const gone = await sync(KEY, { mode: 'apply', fingerprint: FP, full: true, items: items2.filter((i) => i.code !== '4') });
   const p3 = await products(A.token);
@@ -206,6 +226,17 @@ async function call(method, url, { token, body } = {}) {
   r = run('--una-vez');
   const pB2 = await products(B.token);
   check('toma los cambios recientes del .log: precio nuevo y artículo nuevo', byCode(pB2, '1').price === 9500 && byCode(pB2, '6') && byCode(pB2, '6').category === 'Verduras', r.stdout);
+  // Un artículo que el negocio ya cargó a mano con el mismo código: el worker avisa y, con --adoptar, lo adopta
+  const manual50 = (await call('POST', '/api/products', { token: B.token, body: { internalCode: '50', name: 'Carne mía', price: 1, category: 'Parrilla' } })).data;
+  fs.appendFileSync(path.join(tmp, 'Datos.log'), "/*C1*/INSERT INTO PLUS VALUES(50,1,'CARNE PICADA X KG','P',100.00)\n");
+  r = run('--una-vez');
+  check('el worker avisa de los artículos ya cargados a mano y cómo adoptarlos', /AVISO: 1 artículos ya estaban cargados a mano/.test(r.stdout) && /--adoptar/.test(r.stdout), r.stdout);
+  check('y el registro NO los anota como actualizados', !/NUEVO\s+50/.test(changesText()) && byCode(await products(B.token), '50').name === 'Carne mía');
+  r = run('--adoptar', '--una-vez');
+  const p50 = byCode(await products(B.token), '50');
+  check('con --adoptar los adopta (aunque la base no haya cambiado)', /adoptados 1/.test(r.stdout) && p50.name === 'Carne Picada x kg' && p50.price === 100 && p50.category === 'Parrilla', r.stdout);
+  check('actualizaciones.log anota la adopción', /ADOPTADOS: 1 artículos/.test(changesText()) && /ADOPTAR\s+50/.test(changesText()), changesText());
+  await call('DELETE', `/api/products/${manual50.id}`, { token: B.token });
   check('el negocio A no recibió nada de este worker', !(await products(A.token)).some((p) => p.name === 'Zapallo Negro x kg'));
   check('actualizaciones.log detalla el precio: antes -> después', /PRECIO\s+1\s+LOMO DE CERDO: \$9\.000,00 -> \$9\.500,00/.test(changesText()), changesText());
   check('y el artículo nuevo con su precio y unidad', /NUEVO\s+6\s+ZAPALLO NEGRO X KG: \$800,00 \/ kg/.test(changesText()), changesText());

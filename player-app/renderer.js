@@ -776,6 +776,14 @@ function renderCarousel(mediaList, durationMs, transition, box = mediaContainer)
       el = document.createElement('video');
       el.loop = true;
       el.muted = true;
+      // Sin controles del sistema: Android TV mostraba un ícono de "transmitir" (cast) encima del video
+      el.controls = false;
+      el.disableRemotePlayback = true;
+      el.playsInline = true;
+      el.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
+      el.setAttribute('disablepictureinpicture', '');
+      el.setAttribute('x-webkit-airplay', 'deny');
+      el.tabIndex = -1;
     } else {
       // Imagen completa (contain) sobre una copia difuminada que rellena el resto del panel
       el = document.createElement('div');
@@ -1064,8 +1072,11 @@ function fillBoardList(board, rows, priceList) {
       const unit = (item.unit || '').trim();
       if (unit && !['unidad', 'u', 'un'].includes(unit.toLowerCase())) row.appendChild(h('span', 'b-unit', '/' + unit));
       const old = Number(item.oldPrice);
-      if (Number.isFinite(old) && old > Number(item.price)) row.appendChild(h('span', 'b-old', formatPrice(old)));
-      row.appendChild(h('span', 'b-price' + (Number.isFinite(old) && old > Number(item.price) ? ' promo' : ''), formatPrice(item.price)));
+      const discounted = Number.isFinite(old) && old > Number(item.price);
+      const box = h('span', 'b-pricebox');
+      if (discounted) box.appendChild(h('span', 'b-old', formatPrice(old)));
+      box.appendChild(h('span', 'b-price' + (discounted ? ' promo' : ''), formatPrice(item.price)));
+      row.appendChild(box);
       rows.appendChild(row);
     }
   }

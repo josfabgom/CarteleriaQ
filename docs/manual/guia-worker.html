@@ -162,12 +162,13 @@ El servicio corre como cuenta SYSTEM. Si la base de Itegra está en una carpeta 
 <h2>Comandos útiles</h2>
 <table>
   <tr><th style="width:36%">Comando</th><th>Para qué</th></tr>
-  <tr><td><code>.worker.exe --previsualizar</code></td><td>Ver qué cambiaría, sin aplicar nada.</td></tr>
-  <tr><td><code>.worker.exe --aplicar</code></td><td>Primera carga real.</td></tr>
-  <tr><td><code>.worker.exe --una-vez</code></td><td>Una revisión manual ahora mismo.</td></tr>
+  <tr><td><code>.\worker.exe --previsualizar</code></td><td>Ver qué cambiaría, sin aplicar nada.</td></tr>
+  <tr><td><code>.\worker.exe --aplicar</code></td><td>Primera carga real.</td></tr>
+  <tr><td><code>.\worker.exe --una-vez</code></td><td>Una revisión manual ahora mismo.</td></tr>
   <tr><td><code>aplicar-ahora.bat</code></td><td>Doble clic: sube los cambios de Itegra ahora mismo (hace <code>worker.exe --aplicar</code>) y muestra los últimos cambios registrados.</td></tr>
-  <tr><td><code>.worker.exe --forzar</code></td><td>Salta las protecciones (solo si el cambio grande es real).</td></tr>
-  <tr><td><code>.worker.exe --ayuda</code></td><td>Muestra las opciones.</td></tr>
+  <tr><td><code>.\worker.exe --forzar</code></td><td>Salta las protecciones (solo si el cambio grande es real).</td></tr>
+  <tr><td><code>.\worker.exe --adoptar --aplicar</code></td><td>Los artículos que el cliente <b>ya tenía cargados a mano</b> con el mismo código pasan a actualizarse desde Itegra (ver nota abajo).</td></tr>
+  <tr><td><code>.\worker.exe --ayuda</code></td><td>Muestra las opciones.</td></tr>
 </table>
 
 <h2>Problemas frecuentes</h2>
@@ -205,7 +206,7 @@ El servicio corre como cuenta SYSTEM. Si la base de Itegra está en una carpeta 
   <li>Si antes estaba instalado como tarea programada, <code>instalar-servicio.bat</code> la reemplaza solo.</li>
   <li>Los tipos de artículo de Itegra: <b>P</b> = pesable (se sube como <code>kg</code>), <b>N</b> = por unidad (<code>unidad</code>). Los tipos <b>R</b> y <b>X</b> no se suben (se puede cambiar con <code>tiposDeArticulo</code> en la configuración).</li>
   <li>Los precios de Itegra a veces traen centavos «de ruido» (por ejemplo $26.600,01). Se suben tal cual.</li>
-  <li>Si el cliente <b>ya cargó su catálogo a mano</b> (por ejemplo, importando un archivo), esos artículos figurarán como «omitidos por conflicto» y el worker no los va a actualizar. Hay que acordar con soporte cómo adoptarlos antes de activar el worker.</li>
+  <li>Si el cliente <b>ya cargó su catálogo a mano</b> (por ejemplo, importando un archivo), el worker los reconoce por el código, <b>no los toca</b> y avisa en el log: «AVISO: N artículos ya estaban cargados a mano con el mismo código…». Para que Itegra pase a actualizarlos hay que ejecutar <b>una vez</b> <code>.\worker.exe --adoptar --aplicar</code>. La vista previa (<code>--previsualizar --adoptar</code>) muestra antes cuántos se adoptarían y un ejemplo con el cambio de nombre y precio. Al adoptarlos, Itegra pasa a mandar sobre el nombre, el precio y la unidad; la categoría, la foto, la etiqueta y el precio anterior del cliente se conservan. Después de adoptados se actualizan solos y no hace falta repetirlo.</li>
   <li>El archivo <code>estado.json</code> guarda qué se envió por última vez: no lo borres salvo que quieras repetir la primera carga (se vuelve a pedir <code>--aplicar</code>).</li>
 </ul>
 

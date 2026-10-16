@@ -3,7 +3,7 @@ import { API_URL } from '../config';
 import { apiFetch } from '../api';
 
 interface Summary {
-  mode: string; at: string; total: number; created: number; updated: number; unchanged: number; restored: number; hidden: number; conflicts: number;
+  mode: string; at: string; total: number; created: number; updated: number; unchanged: number; restored: number; hidden: number; conflicts: number; adopted?: number;
 }
 interface IntegrationKey {
   id: string; name: string; prefix: string; linked: boolean; fingerprint: string | null;
@@ -139,7 +139,7 @@ const IntegrationManager = () => {
                   {s && (
                     <div>
                       {s.mode === 'preview' ? 'Vista previa' : 'Último resultado'}: {s.total} artículos leídos — <strong>{s.created}</strong> nuevos, <strong>{s.updated}</strong> actualizados, {s.unchanged} sin cambios
-                      {s.hidden > 0 && <>, <strong>{s.hidden}</strong> sin stock</>}{s.restored > 0 && <>, {s.restored} repuestos</>}{s.conflicts > 0 && <>, <span className="text-orange-600">{s.conflicts} omitidos (ya cargados a mano con ese código)</span></>}
+                      {s.hidden > 0 && <>, <strong>{s.hidden}</strong> sin stock</>}{s.restored > 0 && <>, {s.restored} repuestos</>}{(s.adopted ?? 0) > 0 && <>, <strong>{s.adopted}</strong> adoptados</>}{s.conflicts > 0 && <>, <span className="text-orange-600">{s.conflicts} omitidos (ya cargados a mano con ese código; para que Itegra los actualice, ejecutá el worker con <code>--adoptar</code>)</span></>}
                       {s.mode === 'preview' && <span className="text-orange-600"> · todavía no se aplicó</span>}
                     </div>
                   )}

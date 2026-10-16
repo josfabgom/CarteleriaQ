@@ -84,6 +84,7 @@ router.post('/itegra/sync', syncLimiter, requireIntegrationKey, async (req, res)
   const businessId = key.businessId;
   const full = body.full === true;
   const force = body.force === true;
+  const adopt = body.adopt === true; // los artículos ya cargados a mano con el mismo código pasan a actualizarse desde Itegra
 
   const codes = items.map((i) => i.code);
   const existing = await prisma.product.findMany({ where: { businessId, OR: [{ source: 'itegra' }, { internalCode: { in: codes } }] } });
@@ -94,6 +95,8 @@ router.post('/itegra/sync', syncLimiter, requireIntegrationKey, async (req, res)
   const conflicts: { code: string; name: string }[] = [];
   let unchanged = 0;
   let restored = 0;
+  const adoptedSample: { code: string; before: string; after: string }[] = [];
+  let adopted = 0;
 
   for (const it of items) {
     const found = byCode.get(it.code);
@@ -102,7 +105,8 @@ router.post('/itegra/sync', syncLimiter, requireIntegrationKey, async (req, res)
       creates.push({ businessId, internalCode: it.code, name, price: it.price, unit: it.unit, category: categorize(it.name), source: 'itegra', available: true });
       continue;
     }
-    if (found.source !== 'itegra') { conflicts.push({ code: it.code, name: found.name }); continue; } // cargado a mano: no se toca
+    const isAdoption = found.source !== 'itegra';
+    if (isAdoption && !adopt) { conflicts.push({ code: it.code, name: found.name }); continue; } // cargado a mano: no se toca
 
     // Itegra manda sobre nombre, precio y unidad; categoría, foto, etiqueta y precio anterior son de la nube
     const data: Prisma.ProductUpdateInput = {};
@@ -111,6 +115,11 @@ router.post('/itegra/sync', syncLimiter, requireIntegrationKey, async (req, res)
     if (it.unit && found.unit !== it.unit) data.unit = it.unit;
     if (!found.category) data.category = categorize(it.name);
     if (found.autoHidden) { data.available = true; data.autoHidden = false; restored++; }
+    if (isAdoption) {
+      data.source = 'itegra';
+      adopted++;
+      if (adoptedSample.length < 8) adoptedSample.push({ code: it.code, before: `${found.name} · $${found.price}`, after: `${name} · $${it.price}` });
+    }
     if (Object.keys(data).length) updates.push({ id: found.id, data }); else unchanged++;
   }
 
@@ -135,6 +144,7 @@ router.post('/itegra/sync', syncLimiter, requireIntegrationKey, async (req, res)
     updated: updates.length,
     unchanged,
     restored,
+    adopted,
     hidden: missing.length,
     conflicts: conflicts.length,
     needsForce
@@ -161,7 +171,9 @@ router.post('/itegra/sync', syncLimiter, requireIntegrationKey, async (req, res)
     ...summary,
     business: key.business.name,
     sampleCreated: creates.slice(0, 8).map((c) => ({ code: c.internalCode, name: c.name, category: c.category, price: c.price, unit: c.unit })),
-    conflictList: conflicts.slice(0, 20)
+    conflictList: conflicts.slice(0, 20),
+    conflictCodes: conflicts.map((c) => c.code), // todos, para que el worker no registre como actualizados los que se omitieron
+    adoptedSample
   });
 });
 

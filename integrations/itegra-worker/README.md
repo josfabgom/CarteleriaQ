@@ -10,7 +10,7 @@ Programa que se instala **en la PC donde corre Itegra**. Lee la base de Itegra y
 - Sube únicamente los artículos de tipo **P** (pesables → `kg`) y **N** (por unidad → `unidad`). Los tipos **R** y **X** (con precio 0) no se suben.
 - Itegra manda sobre **código, nombre, precio y unidad**. La **categoría, foto, etiqueta y precio anterior** que cargues en el panel no se pisan.
 - Un artículo que deja de existir en Itegra queda **sin stock** en la nube (no se borra). Si vuelve, se repone.
-- Un artículo cargado a mano en el panel con el mismo código **no se toca**: se avisa como conflicto.
+- Un artículo cargado a mano en el panel con el mismo código **no se toca**: se avisa como conflicto. Para que Itegra los actualice, ejecutar una vez con `--adoptar` (ver abajo).
 - Si una lectura viene incompleta (faltan muchos artículos de golpe), **no se aplica** y se avisa.
 
 ## Cómo sabe a qué cliente actualizar
@@ -78,6 +78,7 @@ Para **forzar una actualización ahora** (sin esperar los 5 minutos): doble clic
 | `node worker.js` | Modo normal: revisa cada X minutos y sube solo las diferencias |
 | `node worker.js --una-vez` | Una sola revisión |
 | `--forzar` | Salta las protecciones (lectura incompleta). Usar solo si el cambio es real |
+| `--adoptar` | Los artículos ya cargados a mano en el panel con el mismo código pasan a actualizarse desde Itegra (nombre, precio y unidad). Se conservan su categoría, foto, etiqueta y precio anterior. Combinar con `--previsualizar` para ver antes cuántos y qué cambiaría |
 
 Hasta que se ejecuta `--aplicar` por primera vez, el worker **solo previsualiza**. Una vez al día hace una revisión completa (es la que marca sin stock los artículos que ya no existen).
 
@@ -115,3 +116,12 @@ Itegra guarda los cambios recientes en `Datos.log` hasta que cierra o guarda la 
 node test-db.js          # lector de la base (incluye una base sintética)
 cd ..\..\backend-api && node scripts/test-integrations.js   # servidor + worker completo
 ```
+
+## Clientes que ya tienen su catálogo cargado
+
+Si el negocio ya cargó sus artículos antes de usar el worker (por ejemplo, importando un CSV), el worker los reconoce **por el código** (`NROPLU`) y, por seguridad, **no los toca**: el log dice `AVISO: N artículos ya estaban cargados a mano con el mismo código...` y el panel muestra «omitidos». Para que Itegra pase a actualizarlos:
+
+1. `worker.exe --previsualizar --adoptar` → muestra `adoptados N` y ejemplos (`adoptar: código nombre·precio antes -> después`).
+2. Si está bien: `worker.exe --adoptar --aplicar` (una sola vez).
+
+Desde ese momento esos artículos se actualizan solos como el resto y no hace falta volver a usar `--adoptar`.

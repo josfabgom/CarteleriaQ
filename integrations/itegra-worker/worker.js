@@ -24,6 +24,7 @@ if (flag('--ayuda') || flag('-h')) {
     '  (sin opciones)    modo normal: revisa cada X minutos y sube solo las diferencias',
     '  --una-vez         una sola revisión y termina',
     '  --forzar          salta las protecciones de lectura incompleta',
+    '  --adoptar         los artículos ya cargados a mano con el mismo código pasan a actualizarse desde Itegra',
     '  --config <ruta>   usa otro archivo de configuración'
   ].join('\n'));
   process.exit(0);
@@ -102,12 +103,17 @@ function logApplied(prevItems, items, serverData) {
     appendChanges([`${ts}  SINCRONIZADO con "${business}": ${describe(serverData)}  (desde acá se registra el detalle de cada cambio)`, '']);
     return;
   }
-  const skip = new Set((serverData.conflictList || []).map((c) => c.code));
+  // Los artículos que el servidor omitió (cargados a mano con el mismo código) no se registran como actualizados
+  const skip = new Set(serverData.conflictCodes || (serverData.conflictList || []).map((c) => c.code));
   const changes = diffItems(prevItems, items).filter((c) => !skip.has(c.code));
   const counts = changes.reduce((a, c) => { a[c.tipo] = (a[c.tipo] || 0) + 1; return a; }, {});
-  if (!changes.length && !serverData.hidden && !serverData.restored && !serverData.conflicts) return; // nada para registrar
+  if (!changes.length && !serverData.hidden && !serverData.restored && !serverData.conflicts && !serverData.adopted) return; // nada para registrar
   const resumen = Object.entries(counts).map(([t, n]) => `${n} ${t.toLowerCase()}`).join(', ') || 'sin cambios en los artículos';
   const lines = [`${ts}  SINCRONIZACIÓN en "${business}": ${resumen}${serverData.conflicts ? ` · omitidos por conflicto: ${serverData.conflicts}` : ''}${serverData.hidden ? ` · sin stock: ${serverData.hidden}` : ''}`];
+  if (serverData.adopted) {
+    lines.push(`   ADOPTADOS: ${serverData.adopted} artículos que ya existían en la nube ahora se actualizan desde Itegra`);
+    for (const a of serverData.adoptedSample || []) lines.push(`   ADOPTAR ${a.code.padStart(5)}  ${a.before} -> ${a.after}`);
+  }
   const MAX = 300;
   for (const c of changes.slice(0, MAX)) lines.push(`   ${c.tipo.padEnd(7)} ${c.code.padStart(5)}  ${c.texto}`);
   if (changes.length > MAX) lines.push(`   ... y ${changes.length - MAX} más`);
@@ -139,7 +145,7 @@ async function post(cfg, body) {
 }
 
 const DAY = 24 * 60 * 60 * 1000;
-const describe = (d) => `nuevos ${d.created}, actualizados ${d.updated}, sin cambios ${d.unchanged}, sin stock ${d.hidden}${d.restored ? `, repuestos ${d.restored}` : ''}${d.conflicts ? `, omitidos por conflicto ${d.conflicts}` : ''}`;
+const describe = (d) => `nuevos ${d.created}, actualizados ${d.updated}, sin cambios ${d.unchanged}, sin stock ${d.hidden}${d.restored ? `, repuestos ${d.restored}` : ''}${d.adopted ? `, adoptados ${d.adopted}` : ''}${d.conflicts ? `, omitidos por conflicto ${d.conflicts}` : ''}`;
 
 // ---------- Una revisión ----------
 let lastSource = null;
@@ -162,13 +168,13 @@ async function runOnce(cfg) {
 
   let mode;
   if (flag('--previsualizar') || !confirmado) mode = 'preview';
-  else if (hash === state.lastHash && !fullDue && !flag('--forzar')) mode = 'ping';
+  else if (hash === state.lastHash && !fullDue && !flag('--forzar') && !flag('--adoptar')) mode = 'ping';
   else mode = 'apply';
 
   const full = mode !== 'ping' && (fullDue || flag('--aplicar') || !state.lastHash || flag('--forzar'));
   log(`Base leída: ${rows.length} artículos${logLines ? ` (+${logLines} cambios recientes)` : ''}; se suben ${items.length}, se omiten ${omitidos} (tipo no incluido, sin nombre o precio inválido).`);
 
-  const res = await post(cfg, { mode, fingerprint, full, force: flag('--forzar'), items: mode === 'ping' ? undefined : items });
+  const res = await post(cfg, { mode, fingerprint, full, force: flag('--forzar'), adopt: flag('--adoptar'), items: mode === 'ping' ? undefined : items });
 
   if (res.status === 401) throw Object.assign(new Error('La clave de integración no es válida o fue revocada. Pedí una nueva en el panel.'), { fatal: true });
   if (res.status === 403) throw Object.assign(new Error(res.data.error || 'Acceso denegado.'), { fatal: true });
@@ -178,6 +184,8 @@ async function runOnce(cfg) {
   if (mode === 'ping') { log(`Sin cambios (${res.data.business}).`); return { ok: true }; }
 
   log(`${mode === 'preview' ? 'VISTA PREVIA' : 'Sincronizado'} con "${res.data.business}": ${describe(res.data)}.`);
+  if (res.data.conflicts && !flag('--adoptar')) log(`AVISO: ${res.data.conflicts} artículos ya estaban cargados a mano con el mismo código y no se actualizan desde Itegra. Si querés que Itegra los actualice, ejecutá el worker con --adoptar (por ejemplo: worker.exe --adoptar --aplicar).`);
+  for (const a of res.data.adoptedSample || []) log(`   adoptar: ${a.code} ${a.before} -> ${a.after}`);
   if (mode === 'preview') {
     for (const s of res.data.sampleCreated || []) log(`   nuevo: ${s.code} ${s.name}  [${s.category}]  $${s.price}${s.unit ? ' / ' + s.unit : ''}`);
     if (!confirmado || flag('--previsualizar')) log('No se aplicó nada. Si el negocio es el correcto, ejecutá el worker con --aplicar (node worker.js --aplicar, o worker.exe --aplicar).');
