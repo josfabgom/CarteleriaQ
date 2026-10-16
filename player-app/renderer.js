@@ -202,6 +202,14 @@ async function fetchSync() {
 }
 
 // Bucle de sincronización: nunca desvincula por errores de red, solo si el servidor dice que la pantalla no existe
+// Huella del contenido: sin campos que cambian en cada consulta (updatedAt se actualiza con cada señal de la TV).
+// Antes, eso reiniciaba el reproductor cada 30 s y cortaba los videos largos.
+function syncSignature(data) {
+  if (!data) return "";
+  const { updatedAt, ...stable } = data;
+  return JSON.stringify(stable);
+}
+
 async function syncLoop(failures = 0) {
   const result = await fetchSync();
 
@@ -216,7 +224,7 @@ async function syncLoop(failures = 0) {
   if (result.status === 'ok') {
     setOffline(false);
     if (!setupOpen) pairingContainer.style.display = 'none';
-    if (JSON.stringify(result.data) !== JSON.stringify(currentSyncData)) {
+    if (syncSignature(result.data) !== syncSignature(currentSyncData)) {
       saveCachedConfig(result.data);
       startPlayer(result.data);
     }
@@ -696,23 +704,51 @@ function startPlayer(screenData) {
   playScene(scenes, found >= 0 ? found : 0, screenData, true);
 }
 
+const isVideoMedia = (m) => !!m && (m.type === 'video' || /\.(mp4|webm|ogg)$/i.test(m.url || ''));
+
+// Un video a pantalla completa se reproduce COMPLETO: la escena dura lo que dure el video (o la duración configurada,
+// si es mayor, repitiéndolo). Antes se cortaba al cumplirse la duración de la escena (10 s por defecto).
+function holdForVideo(scene, token, multiple, arm, advance) {
+  const v = mediaContainer.querySelector('video');
+  if (!v) return;
+  if (!multiple) { v.loop = true; return; } // una sola escena: el video se repite sin cortes
+  v.loop = false;
+  const baselineMs = Math.max(3, scene.duration) * 1000;
+  const startedAt = Date.now();
+  const rearm = () => { if (token === sceneToken && Number.isFinite(v.duration)) arm(Math.max(baselineMs, v.duration * 1000 + 4000)); };
+  v.onloadedmetadata = rearm;
+  if (v.readyState >= 1) rearm();
+  v.onended = () => {
+    if (token !== sceneToken) return;
+    if (Date.now() - startedAt >= baselineMs - 500) advance(); // terminó el video y ya pasó la duración de la escena
+    else { v.currentTime = 0; v.play().catch(() => {}); }       // el video dura menos que la escena: se repite
+  };
+  v.onerror = () => { if (token === sceneToken) arm(Math.max(1000, baselineMs - (Date.now() - startedAt))); };
+}
+
 function playScene(scenes, index, screenData, immediate) {
   const scene = scenes[index];
   const token = ++sceneToken;
+  const multiple = scenes.length > 1; // con una sola escena no hay rotación
+  const advance = () => { if (token === sceneToken) playScene(scenes, (index + 1) % scenes.length, screenData, false); };
+  const arm = (ms) => {
+    if (!multiple) return;
+    if (sceneTimer) clearTimeout(sceneTimer);
+    sceneTimer = setTimeout(advance, ms);
+  };
   const show = () => {
     if (token !== sceneToken) return;
     currentSceneId = scene.id;
     renderScene(scene, screenData);
     document.body.classList.remove('scene-out');
+    if (scene.type === 'media' && isVideoMedia(scene.media)) holdForVideo(scene, token, multiple, arm, advance);
   };
   if (immediate) show();
   else { document.body.classList.add('scene-out'); setTimeout(show, 380); }
 
-  // Con una sola escena no hay rotación
-  if (scenes.length > 1) {
-    if (sceneTimer) clearTimeout(sceneTimer);
-    sceneTimer = setTimeout(() => playScene(scenes, (index + 1) % scenes.length, screenData, false), Math.max(3, scene.duration) * 1000);
-  }
+  // Un video espera a conocer su duración (hasta 3 min como tope de seguridad); el resto, la duración de la escena
+  const baselineMs = Math.max(3, scene.duration) * 1000;
+  arm(scene.type === 'media' && isVideoMedia(scene.media) ? Math.max(baselineMs, 180000) : baselineMs);
 }
 
 function renderIdle(screenData) {
@@ -814,13 +850,37 @@ function renderCarousel(mediaList, durationMs, transition, box = mediaContainer)
       document.head.appendChild(style);
     }
 
-    carouselInterval = setInterval(() => {
+    const go = () => {
       elements[currentIndex].classList.remove('active');
       if (elements[currentIndex].tagName === 'VIDEO') elements[currentIndex].pause();
       currentIndex = (currentIndex + 1) % elements.length;
       elements[currentIndex].classList.add('active');
-      if (elements[currentIndex].tagName === 'VIDEO') elements[currentIndex].play().catch((e) => console.log(e));
-    }, durationMs);
+      stepFrom();
+    };
+    // Cada elemento se muestra durationMs; un video se reproduce completo (si dura más) y se repite si dura menos
+    const stepFrom = () => {
+      const el = elements[currentIndex];
+      const startedAt = Date.now();
+      let timer = null;
+      const setTimer = (ms) => { clearTimeout(timer); timer = setTimeout(go, ms); carouselInterval = timer; };
+      if (el.tagName === 'VIDEO') {
+        el.loop = false;
+        try { el.currentTime = 0; } catch (e) { /* aún sin cargar */ }
+        el.play().catch((e) => console.log(e));
+        setTimer(Math.max(durationMs, 180000)); // hasta conocer la duración del video
+        const rearm = () => { if (Number.isFinite(el.duration)) setTimer(Math.max(durationMs, el.duration * 1000 + 4000)); };
+        el.onloadedmetadata = rearm;
+        if (el.readyState >= 1) rearm();
+        el.onended = () => {
+          if (Date.now() - startedAt >= durationMs - 500) go();
+          else { el.currentTime = 0; el.play().catch(() => {}); }
+        };
+        el.onerror = () => setTimer(Math.max(1000, durationMs - (Date.now() - startedAt)));
+      } else {
+        setTimer(durationMs);
+      }
+    };
+    stepFrom();
   } else {
     // Un solo video: que se reproduzca
     const firstEl = box.querySelector('.media-element.active');

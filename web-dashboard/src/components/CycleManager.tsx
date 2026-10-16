@@ -694,7 +694,7 @@ const SceneModal = ({ scene, isNew, lists, media, products, onClose, onSave }: M
                   );
                 })}
               </div>
-              {images.length === 0 && media.length > 0 && <p className="text-xs text-gray-500 mt-1">Los videos se reproducen en bucle durante la duración de la escena.</p>}
+              {media.some((m) => m.type === 'video') && <p className="text-xs text-gray-500 mt-1">Un video se reproduce <strong>completo</strong>: la escena dura lo que dure el video. Si la duración de la escena es mayor, el video se repite hasta completarla.</p>}
             </div>
           )}
 
