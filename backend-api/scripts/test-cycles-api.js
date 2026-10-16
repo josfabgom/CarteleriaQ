@@ -264,6 +264,31 @@ const upload = (token, name) => {
   const boardPrev = (await call('GET', `/api/cycles/${btpl.data.id}/preview`, { token: A.token })).data;
   check('el estado en vivo marca la cartelera como visible', boardPrev.scenes[0].shown === true && boardPrev.scenes[0].count >= 1);
 
+  console.log('Artículos y archivos borrados después de armar la escena');
+  const temp1 = (await call('POST', '/api/products', { token: A.token, body: { internalCode: 'TMP1', name: 'Temporal 1', price: 10 } })).data;
+  const temp2 = (await call('POST', '/api/products', { token: A.token, body: { internalCode: 'TMP2', name: 'Temporal 2', price: 20 } })).data;
+  const tempImg = (await upload(A.token, 'temporal.png')).data;
+  const staleScene = (cfg) => boardScene({ mediaIds: [bimg.id, tempImg.id], ...cfg });
+  // Se arma con artículos elegidos y se guarda; después se borran artículos y la imagen
+  check('guarda una cartelera con ofertas elegidas', (await saveBoard(staleScene({ offersSource: 'manual', productIds: [temp1.id, temp2.id] }))).status === 200);
+  await call('DELETE', `/api/products/${temp1.id}`, { token: A.token });
+  await call('DELETE', `/api/media/${tempImg.id}`, { token: A.token });
+  const resave = await saveBoard(staleScene({ offersSource: 'manual', productIds: [temp1.id, temp2.id] }));
+  check('con un artículo elegido borrado, el ciclo se guarda igual (se descarta solo)', resave.status === 200, JSON.stringify(resave.data));
+  const resaved = (await call('GET', `/api/cycles/${btpl.data.id}`, { token: A.token })).data.scenes[0].config;
+  check('y quedan solo los que existen (artículo y foto)', resaved.productIds.length === 1 && resaved.productIds[0] === temp2.id && resaved.mediaIds.length === 1 && resaved.mediaIds[0] === bimg.id, JSON.stringify(resaved));
+  await call('DELETE', `/api/products/${temp2.id}`, { token: A.token });
+  const allGone = await saveBoard(staleScene({ offersSource: 'manual', productIds: [temp1.id, temp2.id] }));
+  check('si ya no queda ninguno de los elegidos, avisa con un mensaje claro', allGone.status === 400 && /ya no existen/.test(allGone.data.error), JSON.stringify(allGone.data));
+  const autoStale = await saveBoard(staleScene({ offersSource: 'auto', productIds: [temp1.id, temp2.id] }));
+  check('con ofertas automáticas, los elegidos viejos no impiden guardar', autoStale.status === 200, JSON.stringify(autoStale.data));
+  const autoCfg = (await call('GET', `/api/cycles/${btpl.data.id}`, { token: A.token })).data.scenes[0].config;
+  check('y no se guardan en modo automático', autoCfg.productIds.length === 0);
+  const offersCycle = (await call('POST', '/api/cycles', { token: A.token, body: { name: 'Ofertas viejas' } })).data;
+  const offersStale = await call('PUT', `/api/cycles/${offersCycle.id}/scenes`, { token: A.token, body: { scenes: [{ type: 'offers', duration: 10, config: { source: 'manual', design: 'hero', productIds: [temp1.id, asado.id], title: 'OFERTAS' } }] } });
+  check('lo mismo en una escena de ofertas común', offersStale.status === 200);
+  check('un artículo de otro negocio sigue siendo un error (no se descarta en silencio)', (await call('PUT', `/api/cycles/${offersCycle.id}/scenes`, { token: A.token, body: { scenes: [{ type: 'offers', duration: 10, config: { source: 'manual', design: 'hero', productIds: [(await mkProduct(B.token, { internalCode: 'Z9', name: 'Ajeno 2', price: 1 })).id], title: 'OFERTAS' } }] } })).status === 400);
+
   console.log('Borrar una pantalla');
   const tv3 = await mkScreen('TV 3');
   await call('POST', `/api/screens/${tv3.id}/assign`, { token: A.token, body: { priceListId: list.id, mediaIds: [], layout: 'full-menu' } });

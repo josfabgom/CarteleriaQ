@@ -124,21 +124,42 @@ export async function validateScenes(businessId: string, input: unknown): Promis
     }
   }
 
-  // Todo lo referenciado debe pertenecer al negocio
+  // Lo referenciado debe pertenecer al negocio. Un id de OTRO negocio es un error; un id que ya no existe en ninguna parte
+  // (un artículo o archivo borrado después de armar la escena) se descarta solo: antes impedía guardar el ciclo.
   const listIds = [...new Set(scenes.map((s) => s.priceListId).filter((x): x is string => !!x))];
-  const mediaIds = [...new Set(scenes.flatMap((s) => [s.mediaId, ...((s.config.sideMediaIds as string[]) ?? []), ...((s.config.mediaIds as string[]) ?? [])]).filter((x): x is string => !!x))];
+  const primaryMediaIds = scenes.map((s) => s.mediaId).filter((x): x is string => !!x);
+  const optionalMediaIds = scenes.flatMap((s) => [...((s.config.sideMediaIds as string[]) ?? []), ...((s.config.mediaIds as string[]) ?? [])]);
+  const mediaIds = [...new Set([...primaryMediaIds, ...optionalMediaIds])];
   const productIds = [...new Set(scenes.flatMap((s) => (s.config.productIds as string[]) ?? []))];
 
   const [lists, media, products] = await Promise.all([
-    listIds.length ? prisma.priceList.count({ where: { id: { in: listIds }, businessId } }) : 0,
-    mediaIds.length ? prisma.media.count({ where: { id: { in: mediaIds }, businessId } }) : 0,
-    productIds.length ? prisma.product.count({ where: { id: { in: productIds }, businessId } }) : 0
+    listIds.length ? prisma.priceList.findMany({ where: { id: { in: listIds } }, select: { id: true, businessId: true } }) : [],
+    mediaIds.length ? prisma.media.findMany({ where: { id: { in: mediaIds } }, select: { id: true, businessId: true } }) : [],
+    productIds.length ? prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, businessId: true } }) : []
   ]);
-  if (lists !== listIds.length) return { error: 'Una de las listas de precios no existe.' };
-  if (media !== mediaIds.length) return { error: 'Una de las imágenes o videos no existe.' };
-  if (products !== productIds.length) return { error: 'Uno de los artículos elegidos no existe.' };
+  const mine = (rows: { id: string; businessId: string | null }[]) => new Set(rows.filter((r) => r.businessId === businessId).map((r) => r.id));
+  const foreign = (rows: { id: string; businessId: string | null }[]) => rows.some((r) => r.businessId !== businessId);
+  const myLists = mine(lists), myMedia = mine(media), myProducts = mine(products);
 
-  // Una escena de media debe ser un archivo válido y las de promos al costado también
+  if (foreign(lists) || listIds.some((id) => !myLists.has(id))) return { error: 'Una de las listas de precios no existe.' };
+  if (foreign(media)) return { error: 'Una de las imágenes o videos no existe.' };
+  if (foreign(products)) return { error: 'Uno de los artículos elegidos no existe.' };
+  if (primaryMediaIds.some((id) => !myMedia.has(id))) return { error: 'Una de las imágenes o videos no existe.' };
+
+  for (const [i, sc] of scenes.entries()) {
+    const n = i + 1;
+    if (sc.config.sideMediaIds) sc.config.sideMediaIds = (sc.config.sideMediaIds as string[]).filter((id) => myMedia.has(id));
+    if (sc.config.mediaIds) sc.config.mediaIds = (sc.config.mediaIds as string[]).filter((id) => myMedia.has(id));
+    if (sc.config.productIds) {
+      const manual = (sc.config.source ?? sc.config.offersSource) === 'manual';
+      sc.config.productIds = manual ? (sc.config.productIds as string[]).filter((id) => myProducts.has(id)) : []; // en modo automático no se guardan elegidos
+      const needsOffers = sc.type === 'offers' || (sc.type === 'board' && sc.config.showOffers !== false);
+      if (manual && needsOffers && (sc.config.productIds as string[]).length === 0) {
+        return { error: `Escena ${n}: los artículos elegidos para las ofertas ya no existen. Elegí otros o pasá a ofertas automáticas.` };
+      }
+    }
+  }
+
   return { scenes };
 }
 
