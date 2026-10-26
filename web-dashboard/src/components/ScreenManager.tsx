@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../config';
 import { apiFetch } from '../api';
+import ScenePreview from './ScenePreview';
 
 const ScreenManager = ({ onEditCycle }: { onEditCycle?: (id: string) => void }) => {
   const [screens, setScreens] = useState<any[]>([]);
@@ -9,6 +10,7 @@ const ScreenManager = ({ onEditCycle }: { onEditCycle?: (id: string) => void }) 
   const [newScreenName, setNewScreenName] = useState('');
   const [newScreenLocation, setNewScreenLocation] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
+  const [previewScreen, setPreviewScreen] = useState<{ id: string; name: string } | null>(null);
   
   const [showModal, setShowModal] = useState(false);
   const [selectedScreenId, setSelectedScreenId] = useState<string | null>(null);
@@ -243,6 +245,7 @@ const ScreenManager = ({ onEditCycle }: { onEditCycle?: (id: string) => void }) 
               </div>
             </div>
 
+            <button onClick={() => setPreviewScreen({ id: screen.id, name: screen.name })} className="w-full mb-2 bg-gray-800 text-white py-2 rounded text-sm font-medium hover:bg-gray-700">👁 Vista previa de la pantalla</button>
             <div className="flex space-x-2 border-t border-gray-100 pt-4">
               <button onClick={() => openAssignModal(screen.id)} className="flex-1 bg-blue-50 text-blue-700 py-1.5 rounded text-sm font-medium hover:bg-blue-100 border border-blue-200">Configuración rápida</button>
               <button onClick={() => handleDelete(screen.id)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded text-sm font-medium hover:bg-red-100">Eliminar</button>
@@ -257,6 +260,10 @@ const ScreenManager = ({ onEditCycle }: { onEditCycle?: (id: string) => void }) 
       </div>
 
       {/* Modal de Asignación */}
+      {previewScreen && (
+        <ScenePreview title={`Vista previa: ${previewScreen.name}`} loader={() => apiFetch(`/api/screens/${previewScreen.id}/preview-data`)} onClose={() => setPreviewScreen(null)} />
+      )}
+
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">

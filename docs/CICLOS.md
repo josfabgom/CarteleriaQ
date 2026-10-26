@@ -37,3 +37,11 @@ Una escena que arma la pantalla entera, pensada para locales donde se quiere ver
 - 5 estilos: oscuro, vino, azul, verde y claro.
 
 Si no hay fotos elegidas o no hay ofertas hoy, ese recuadro se oculta y el resto ocupa el espacio. Se crea desde Ciclos → "Empezar con: Cartelera completa" o agregando la escena a un ciclo existente. Hay un prototipo de diseño en `docs/prototipo/cartelera.html`.
+
+## Vista previa
+Se puede ver cómo queda en la TV sin ir a la TV: es el **mismo reproductor** en un cuadro 16:9 dentro del panel.
+- **Pantallas → «👁 Vista previa de la pantalla»**: muestra el ciclo que tiene asignada esa pantalla.
+- **Ciclos → «👁 Ver»** (en la lista) o **«👁 Vista previa»** (dentro del editor): muestra el ciclo. En el editor se ven también los **cambios sin guardar**.
+- **«👁 Ver»** en una escena: muestra solo esa escena.
+- Controles: anterior, pausa/continuar, siguiente, pantalla completa y un botón por cada escena para saltar a ella. Los videos se ven sin sonido.
+- La vista previa usa la versión más reciente del reproductor; una TV puede tardar unos minutos en actualizarse por aire.

@@ -289,6 +289,35 @@ const upload = (token, name) => {
   check('lo mismo en una escena de ofertas común', offersStale.status === 200);
   check('un artículo de otro negocio sigue siendo un error (no se descarta en silencio)', (await call('PUT', `/api/cycles/${offersCycle.id}/scenes`, { token: A.token, body: { scenes: [{ type: 'offers', duration: 10, config: { source: 'manual', design: 'hero', productIds: [(await mkProduct(B.token, { internalCode: 'Z9', name: 'Ajeno 2', price: 1 })).id], title: 'OFERTAS' } }] } })).status === 400);
 
+  console.log('Vista previa en el panel');
+  const lastSeenOf = async (id) => (await call('GET', '/api/screens', { token: A.token })).data.find((s) => s.id === id)?.lastSeenAt;
+  await call('POST', `/api/screens/${tv1.id}/cycle`, { token: A.token, body: { playlistId: btpl.data.id } });
+  await saveBoard(boardScene({ offersSource: 'auto', mediaIds: [bimg.id], ticker: ['Aviso de prueba'] }));
+  await sync(tv1);
+  const seenBefore = await lastSeenOf(tv1.id);
+  const pv = await call('GET', `/api/screens/${tv1.id}/preview-data`, { token: A.token });
+  const live = await sync(tv1);
+  check('la vista previa de una pantalla devuelve lo mismo que recibe la TV', pv.status === 200 && pv.data.scenes.length === live.scenes.length && pv.data.scenes[0].type === 'board' && JSON.stringify(pv.data.scenes[0].priceList) === JSON.stringify(live.scenes[0].priceList), JSON.stringify(pv.data).slice(0, 200));
+  check('con su ciclo, transición y nombre', pv.data.cycleName === 'Cartelera' && !!pv.data.transition && pv.data.title === 'TV 1');
+  check('y no cambia el estado de la pantalla (no la marca en línea)', (await lastSeenOf(tv1.id)) === seenBefore);
+  check('otro negocio no puede verla', (await call('GET', `/api/screens/${tv1.id}/preview-data`, { token: B.token })).status === 404);
+  check('sin sesión no se puede', (await call('GET', `/api/screens/${tv1.id}/preview-data`)).status === 401);
+
+  const pc = await call('GET', `/api/cycles/${btpl.data.id}/preview-data`, { token: A.token });
+  check('la vista previa de un ciclo guardado trae sus escenas', pc.status === 200 && pc.data.scenes.length === 1 && pc.data.title === 'Cartelera');
+  check('otro negocio no ve ese ciclo', (await call('GET', `/api/cycles/${btpl.data.id}/preview-data`, { token: B.token })).status === 404);
+
+  const draft = [boardScene({ title: 'Borrador', offersSource: 'auto' }), { type: 'text', duration: 8, config: { title: 'Aviso nuevo', subtitle: '', theme: 'green' } }, { type: 'text', enabled: false, duration: 8, config: { title: 'Apagada', theme: 'red' } }];
+  const pd = await call('POST', '/api/cycles/preview-data', { token: A.token, body: { title: 'Mi ciclo', scenes: draft } });
+  check('se puede ver una edición sin guardar', pd.status === 200 && pd.data.scenes.length === 2 && pd.data.scenes[0].type === 'board' && pd.data.scenes[0].title === 'Borrador' && pd.data.scenes[1].title === 'Aviso nuevo', JSON.stringify(pd.data).slice(0, 200));
+  check('lo mismo que arma la TV: ofertas y lista de precios incluidas', Array.isArray(pd.data.scenes[0].offers) && pd.data.scenes[0].priceList.items.length > 0);
+  check('las escenas desactivadas no se muestran', !pd.data.scenes.some((x) => x.title === 'Apagada'));
+  check('y no guarda nada', (await call('GET', `/api/cycles/${btpl.data.id}`, { token: A.token })).data.scenes[0].config.title !== 'Borrador');
+  check('un borrador inválido da error claro', (await call('POST', '/api/cycles/preview-data', { token: A.token, body: { scenes: [{ type: 'board', duration: 60, config: {} }] } })).status === 400);
+  const foreignImg = (await upload(B.token, 'ajena-vp.png')).data;
+  check('un archivo de otro negocio da error', (await call('POST', '/api/cycles/preview-data', { token: A.token, body: { scenes: [{ type: 'media', duration: 10, mediaId: foreignImg.id, config: {} }] } })).status === 400);
+  check('sin sesión no se puede', (await call('POST', '/api/cycles/preview-data', { body: { scenes: [] } })).status === 401);
+
   console.log('Borrar una pantalla');
   const tv3 = await mkScreen('TV 3');
   await call('POST', `/api/screens/${tv3.id}/assign`, { token: A.token, body: { priceListId: list.id, mediaIds: [], layout: 'full-menu' } });

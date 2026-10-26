@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import prisma from '../prisma';
 import { bid, requireBusiness } from '../auth';
-import { buildScenes, replaceScenes, starterScenes, validateScenes, SceneData, Template } from '../scenes';
+import { buildScenes, previewScenes, replaceScenes, starterScenes, validateScenes, SceneData, Template } from '../scenes';
 
 const router = Router();
 router.use(requireBusiness);
@@ -97,6 +97,23 @@ router.get('/:id', async (req, res) => {
       }
     }))
   });
+});
+
+// Vista previa de las escenas que se están editando (sin guardar): el panel las manda y recibe lo mismo que recibiría la TV
+router.post('/preview-data', async (req, res) => {
+  const businessId = bid(req);
+  const parsed = await validateScenes(businessId, req.body?.scenes);
+  if ('error' in parsed) return res.status(400).json({ error: parsed.error });
+  const transition = ['fade', 'slide', 'zoom'].includes(req.body?.transition) ? req.body.transition : 'fade';
+  res.json({ title: typeof req.body?.title === 'string' ? req.body.title.slice(0, 80) : 'Vista previa', transition, mediaDuration: 10, scenes: await previewScenes(businessId, parsed.scenes) });
+});
+
+// Vista previa de un ciclo guardado
+router.get('/:id/preview-data', async (req, res) => {
+  const businessId = bid(req);
+  const cycle = await prisma.playlist.findFirst({ where: { id: String(req.params.id), businessId } });
+  if (!cycle) return res.status(404).json({ error: 'Ciclo no encontrado' });
+  res.json({ title: cycle.name, transition: 'fade', mediaDuration: 10, scenes: await buildScenes(cycle.id, businessId) });
 });
 
 // Qué mostraría hoy cada escena (las ofertas y las listas se calculan en vivo)

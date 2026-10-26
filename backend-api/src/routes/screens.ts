@@ -153,6 +153,18 @@ router.get('/:id/sync', requireScreenToken, async (req, res) => {
 
 // ---------- Rutas del negocio (dashboard) ----------
 
+// Vista previa en el panel: lo mismo que recibe la TV, sin marcarla como "en línea" ni tocar su estado
+router.get('/:id/preview-data', requireBusiness, async (req, res) => {
+  try {
+    const screen = await prisma.screen.findFirst({ where: { id: String(req.params.id), businessId: bid(req) }, include: { playlist: { select: { name: true } } } });
+    if (!screen) return res.status(404).json({ error: 'Pantalla no encontrada' });
+    const scenes = await buildScenes(screen.playlistId, bid(req));
+    res.json({ title: screen.name, cycleName: screen.playlist?.name ?? null, transition: screen.transition, mediaDuration: screen.mediaDuration, scenes });
+  } catch (error) {
+    res.status(500).json({ error: 'Error generando la vista previa' });
+  }
+});
+
 // Vincular una pantalla con el código que muestra la TV
 router.post('/link', requireBusiness, async (req, res) => {
   try {

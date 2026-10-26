@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API_URL } from '../config';
 import { apiFetch } from '../api';
+import ScenePreview from './ScenePreview';
 
 type SceneType = 'prices' | 'offers' | 'media' | 'text' | 'board';
 
@@ -87,6 +88,7 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
   const [isPrivate, setIsPrivate] = useState(false);
   const [status, setStatus] = useState<PreviewScene[] | null>(null);
   const [modal, setModal] = useState<{ scene: Scene; isNew: boolean } | null>(null);
+  const [preview, setPreview] = useState<{ title: string; loader: () => Promise<Response>; startIndex?: number } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadAll = useCallback(async () => {
@@ -154,6 +156,16 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
   const copyScene = (i: number) => mutate((l) => { const n = [...l]; n.splice(i + 1, 0, { ...l[i], key: newKey(), config: JSON.parse(JSON.stringify(l[i].config)) }); return n; });
 
   const totalEnabled = scenes.filter((s) => s.enabled).reduce((sum, s) => sum + s.duration, 0);
+
+  // Vista previa de lo que se está editando (aunque no esté guardado) o de un ciclo guardado
+  const toPayload = (list: Scene[]) => list.map((s) => ({ type: s.type, name: s.name, duration: s.duration, enabled: s.enabled, priceListId: s.priceListId, mediaId: s.mediaId, config: s.config }));
+  const previewEdited = (list: Scene[], title: string, startIndex = 0) =>
+    setPreview({
+      title,
+      startIndex,
+      loader: () => apiFetch('/api/cycles/preview-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, scenes: toPayload(list) }) })
+    });
+  const previewSaved = (c: CycleSummary) => setPreview({ title: `Vista previa: ${c.name}`, loader: () => apiFetch(`/api/cycles/${c.id}/preview-data`) });
 
   const save = async () => {
     if (!editingId) return;
@@ -251,6 +263,7 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
               </p>
               <div className="flex gap-3 mt-4 text-sm">
                 <button onClick={() => openEditor(c.id)} className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded font-medium border border-blue-200 hover:bg-blue-100">Editar</button>
+                <button onClick={() => previewSaved(c)} className="px-3 py-1.5 border rounded hover:bg-gray-50">👁 Ver</button>
                 <button onClick={() => duplicate(c)} className="px-3 py-1.5 border rounded hover:bg-gray-50">Duplicar</button>
                 <span className="flex-1" />
                 <button onClick={() => remove(c)} className="text-red-500 hover:text-red-700 font-medium">Eliminar</button>
@@ -258,6 +271,7 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
             </div>
           ))}
         </div>
+        {preview && <ScenePreview title={preview.title} loader={preview.loader} startIndex={preview.startIndex} onClose={() => setPreview(null)} />}
       </div>
     );
   }
@@ -269,6 +283,7 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={closeEditor} className="text-blue-600 hover:underline text-sm">← Ciclos</button>
           <input value={name} onChange={(e) => { setName(e.target.value); setDirty(true); }} className="border p-2 rounded text-lg font-bold flex-1 min-w-[12rem]" />
+          <button onClick={() => previewEdited(scenes, name || 'Vista previa del ciclo')} className="bg-gray-800 text-white px-4 py-2 rounded font-medium hover:bg-gray-700">👁 Vista previa</button>
           <button onClick={save} disabled={!dirty || saving} className="bg-green-600 text-white px-5 py-2 rounded font-medium hover:bg-green-700 disabled:opacity-40">{saving ? 'Guardando…' : 'Guardar cambios'}</button>
           {dirty && <button onClick={() => editingId && openEditor(editingId)} className="text-gray-500 hover:underline text-sm">Descartar</button>}
         </div>
@@ -324,6 +339,7 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
                 <input type="checkbox" checked={s.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} /> Activa
               </label>
               <div className="flex gap-3 text-sm">
+                <button onClick={() => previewEdited([{ ...s, enabled: true }], `Vista previa: escena ${i + 1}`)} className="text-gray-700 hover:underline">👁 Ver</button>
                 <button onClick={() => setModal({ scene: JSON.parse(JSON.stringify(s)), isNew: false })} className="text-blue-600 hover:underline">Editar</button>
                 <button onClick={() => copyScene(i)} className="text-gray-600 hover:underline">Duplicar</button>
                 <button onClick={() => removeScene(i)} className="text-red-500 hover:underline">Quitar</button>
@@ -343,6 +359,8 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
           ))}
         </div>
       </div>
+
+      {preview && <ScenePreview title={preview.title} loader={preview.loader} startIndex={preview.startIndex} onClose={() => setPreview(null)} />}
 
       {modal && (
         <SceneModal

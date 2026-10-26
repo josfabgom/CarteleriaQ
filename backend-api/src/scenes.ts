@@ -249,6 +249,48 @@ export async function buildScenes(playlistId: string | null, businessId: string)
     }
   });
 
+  return scenesFromItems(items as unknown as SceneRow[], businessId);
+}
+
+// Lo que necesita armar una escena: la fila del ciclo con su archivo y su lista de precios ya cargados
+interface SceneRow {
+  id: string;
+  type: string;
+  name: string | null;
+  duration: number;
+  config: unknown;
+  media: any;
+  priceList: any;
+}
+
+// Vista previa en el panel: arma las escenas a partir de las que está editando el cliente (aunque no estén guardadas)
+// con exactamente el mismo resultado que recibiría la TV.
+export async function previewScenes(businessId: string, scenes: SceneData[]): Promise<Record<string, unknown>[]> {
+  const active = scenes.filter((sc) => sc.enabled);
+  const listIds = [...new Set(active.map((sc) => sc.priceListId).filter((x): x is string => !!x))];
+  const mediaIds = [...new Set(active.map((sc) => sc.mediaId).filter((x): x is string => !!x))];
+  const [lists, media] = await Promise.all([
+    listIds.length
+      ? prisma.priceList.findMany({
+          where: { id: { in: listIds }, businessId },
+          include: { items: { include: { product: PRODUCT_WITH_IMAGE }, orderBy: [{ order: 'asc' }, { productName: 'asc' }] } }
+        })
+      : [],
+    mediaIds.length ? prisma.media.findMany({ where: { id: { in: mediaIds }, businessId } }) : []
+  ]);
+  const rows: SceneRow[] = active.map((sc, i) => ({
+    id: `preview-${i}`,
+    type: sc.type,
+    name: sc.name,
+    duration: sc.duration,
+    config: sc.config,
+    media: media.find((m) => m.id === sc.mediaId) ?? null,
+    priceList: lists.find((l) => l.id === sc.priceListId) ?? null
+  }));
+  return scenesFromItems(rows, businessId);
+}
+
+async function scenesFromItems(items: SceneRow[], businessId: string): Promise<Record<string, unknown>[]> {
   const out: Record<string, unknown>[] = [];
   for (const it of items) {
     const cfg = (it.config ?? {}) as Record<string, any>;

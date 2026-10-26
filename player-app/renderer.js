@@ -5,6 +5,11 @@ const playerVersion = () => {
   return `${info.label || 'sin versión'} [${info.source || 'web'}]`;
 };
 
+// Modo vista previa: el panel de gestión muestra este mismo reproductor dentro de un cuadro (?preview=1).
+// No se vincula, no consulta al servidor, no se actualiza por aire, no usa ni modifica lo guardado por una TV real
+// y recibe el contenido y las órdenes del panel por mensajes (ver initPreview).
+const PREVIEW = /[?&]preview=1(&|$)/.test(window.location.search);
+
 // Variables de Estado
 let screenId = localStorage.getItem('screenId');
 let screenToken = localStorage.getItem('screenToken'); // credencial de esta pantalla (la entrega el servidor al vincular)
@@ -32,12 +37,13 @@ pairingContainer.style.justifyContent = 'center';
 pairingContainer.style.zIndex = '9999';
 pairingContainer.style.fontFamily = 'sans-serif';
 document.body.appendChild(pairingContainer);
+if (PREVIEW) pairingContainer.style.display = 'none';
 
 // Orden: IP guardada > config.js (CARTELERIA_SERVER) > mismo origen del reproductor.
 // En la app nativa (APK) no hay servidor en el origen, así que se pregunta al primer arranque.
 const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const isLocalOrigin = window.location.protocol === 'file:' || /localhost|127\.0\.0\.1/.test(window.location.origin);
-let serverIp = localStorage.getItem('serverIp')
+let serverIp = PREVIEW ? window.location.origin : localStorage.getItem('serverIp')
   || (window.CARTELERIA_SERVER || '').trim()
   || (isNativeApp ? '' : (isLocalOrigin ? 'http://localhost:3000' : window.location.origin));
 
@@ -342,7 +348,7 @@ const cacheKey = (url) =>
   new URL(/^https?:/i.test(url) ? url : '/media-cache' + (url.startsWith('/') ? url : '/' + url), window.location.href).href;
 
 // Pedir al navegador que no borre la caché si falta espacio
-if (CACHE_ENABLED && navigator.storage && navigator.storage.persist) {
+if (CACHE_ENABLED && !PREVIEW && navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().catch(() => {});
 }
 
@@ -400,7 +406,7 @@ async function syncMediaCache(urls) {
 }
 
 async function getCachedBlobUrl(url) {
-  if (!CACHE_ENABLED) return null;
+  if (!CACHE_ENABLED || PREVIEW) return null; // en la vista previa los medios se piden siempre al servidor
   try {
     const cache = await caches.open(MEDIA_CACHE);
     const res = await cache.match(cacheKey(url));
@@ -663,6 +669,9 @@ let sceneTimer = null;
 let heroTimer = null;
 let currentSceneId = null;
 let sceneToken = 0;
+let previewScenes = []; // vista previa: escenas en reproducción
+let previewIndex = 0;
+let previewPaused = false;
 
 function stopSceneContent() {
   clearBoardTimers();
@@ -694,6 +703,7 @@ function startPlayer(screenData) {
   stopScenes();
 
   const scenes = (screenData.scenes || legacyScenes(screenData)).filter(Boolean);
+  previewScenes = scenes;
   if (scenes.length === 0) {
     currentSceneId = null;
     renderIdle(screenData);
@@ -732,7 +742,7 @@ function playScene(scenes, index, screenData, immediate) {
   const multiple = scenes.length > 1; // con una sola escena no hay rotación
   const advance = () => { if (token === sceneToken) playScene(scenes, (index + 1) % scenes.length, screenData, false); };
   const arm = (ms) => {
-    if (!multiple) return;
+    if (!multiple || previewPaused) return; // en pausa (vista previa) la escena no avanza sola
     if (sceneTimer) clearTimeout(sceneTimer);
     sceneTimer = setTimeout(advance, ms);
   };
@@ -741,6 +751,7 @@ function playScene(scenes, index, screenData, immediate) {
     currentSceneId = scene.id;
     renderScene(scene, screenData);
     document.body.classList.remove('scene-out');
+    if (PREVIEW) { previewIndex = index; notifyPreview(index, scenes.length, scene); }
     if (scene.type === 'media' && isVideoMedia(scene.media)) holdForVideo(scene, token, multiple, arm, advance);
   };
   if (immediate) show();
@@ -1230,11 +1241,54 @@ function startBoardOffers(card, offers) {
   if (offers.length > 1) boardTimers.push(setInterval(draw, 6000));
 }
 
+// ---- Vista previa (modo ?preview=1) ----
+function notifyPreview(index, total, scene) {
+  try { window.parent.postMessage({ type: 'preview:scene', index, total, id: scene && scene.id, duration: scene && scene.duration }, '*'); } catch (e) { /* sin ventana padre */ }
+}
+
+function previewLoad(data, index) {
+  previewPaused = false;
+  currentSceneId = null;
+  startPlayer(data);
+  if (previewScenes.length === 0) notifyPreview(-1, 0, null);
+  else if (Number.isInteger(index) && index > 0) playScene(previewScenes, Math.min(index, previewScenes.length - 1), data, true);
+}
+
+function previewControl(m) {
+  const total = previewScenes.length;
+  if (m.type === 'preview:pause') {
+    previewPaused = true;
+    if (sceneTimer) { clearTimeout(sceneTimer); sceneTimer = null; }
+    stopSceneContent(); // también detiene el cambio de páginas, de ofertas y de imágenes
+    document.querySelectorAll('video').forEach((v) => v.pause());
+  } else if (m.type === 'preview:play') {
+    previewPaused = false;
+    if (total) playScene(previewScenes, previewIndex, currentSyncData, true);
+  } else if (total && (m.type === 'preview:goto' || m.type === 'preview:next' || m.type === 'preview:prev')) {
+    let i = previewIndex;
+    if (m.type === 'preview:goto') i = Math.max(0, Math.min(total - 1, Number(m.index) | 0));
+    else if (m.type === 'preview:next') i = (previewIndex + 1) % total;
+    else i = (previewIndex - 1 + total) % total;
+    playScene(previewScenes, i, currentSyncData, true);
+  }
+}
+
+function initPreview() {
+  window.addEventListener('message', (ev) => {
+    if (ev.source !== window.parent) return; // solo se obedece al panel que contiene este cuadro
+    const m = ev.data || {};
+    if (m.type === 'preview:load' && m.data) previewLoad(m.data, m.index);
+    else if (typeof m.type === 'string' && m.type.indexOf('preview:') === 0) previewControl(m);
+  });
+  try { window.parent.postMessage({ type: 'preview:ready' }, '*'); } catch (e) { /* sin ventana padre */ }
+}
+
 // boot.js no debe reiniciar el reproductor mientras alguien configura el servidor con el control remoto
 window.__playerBusy = () => setupOpen;
 
 // Iniciar
-initPlayer();
+if (PREVIEW) initPreview();
+else initPlayer();
 
 // Si llegamos hasta acá sin errores, avisar a boot.js que esta versión arrancó bien
 // (si no confirma a tiempo, boot.js la descarta y vuelve a la versión anterior)
