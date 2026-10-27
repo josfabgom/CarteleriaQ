@@ -5,6 +5,9 @@ const playerVersion = () => {
   return `${info.label || 'sin versión'} [${info.source || 'web'}]`;
 };
 
+// Imagen transparente de 1x1: se usa como póster de los videos para que Android no dibuje su ícono de "reproducir"
+const TRANSPARENT_POSTER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
 // Modo vista previa: el panel de gestión muestra este mismo reproductor dentro de un cuadro (?preview=1).
 // No se vincula, no consulta al servidor, no se actualiza por aire, no usa ni modifica lo guardado por una TV real
 // y recibe el contenido y las órdenes del panel por mensajes (ver initPreview).
@@ -831,6 +834,9 @@ function renderCarousel(mediaList, durationMs, transition, box = mediaContainer)
       el.setAttribute('disablepictureinpicture', '');
       el.setAttribute('x-webkit-airplay', 'deny');
       el.tabIndex = -1;
+      // Android WebView dibuja un ícono de "reproducir" (▶) mientras carga el primer cuadro del video: se tapa con un póster transparente
+      el.poster = TRANSPARENT_POSTER;
+      el.preload = 'auto';
     } else {
       // Imagen completa (contain) sobre una copia difuminada que rellena el resto del panel
       el = document.createElement('div');
@@ -862,11 +868,24 @@ function renderCarousel(mediaList, durationMs, transition, box = mediaContainer)
     }
 
     const go = () => {
-      elements[currentIndex].classList.remove('active');
-      if (elements[currentIndex].tagName === 'VIDEO') elements[currentIndex].pause();
-      currentIndex = (currentIndex + 1) % elements.length;
-      elements[currentIndex].classList.add('active');
-      stepFrom();
+      const nextIndex = (currentIndex + 1) % elements.length;
+      const next = elements[nextIndex];
+      const swap = () => {
+        elements[currentIndex].classList.remove('active');
+        if (elements[currentIndex].tagName === 'VIDEO') elements[currentIndex].pause();
+        currentIndex = nextIndex;
+        next.classList.add('active');
+        stepFrom();
+      };
+      // Un video que todavía no tiene su primer cuadro no se muestra: se espera (hasta 4 s) en vez de dejar el hueco o el ícono del sistema
+      if (next.tagName === 'VIDEO' && next.readyState < 2) {
+        let done = false;
+        const finish = () => { if (!done) { done = true; swap(); } };
+        next.addEventListener('loadeddata', finish, { once: true });
+        setTimeout(finish, 4000);
+      } else {
+        swap();
+      }
     };
     // Cada elemento se muestra durationMs; un video se reproduce completo (si dura más) y se repite si dura menos
     const stepFrom = () => {
