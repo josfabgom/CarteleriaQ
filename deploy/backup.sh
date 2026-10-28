@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Respaldo de la base de datos y de los archivos subidos. Ejecutar desde la carpeta del proyecto.
-# Cron diario sugerido (3:30 AM):  30 3 * * * cd /opt/CarteleriaQ && ./deploy/backup.sh >> backups/backup.log 2>&1
+# Cron diario sugerido (3:30 AM), en el VPS compartido:
+#   30 3 * * * cd /opt/carteleriaq && COMPOSE="docker compose -p carteleriaq -f docker-compose.shared.yml -f deploy/docker-compose.viajesq-network.yml" ./deploy/backup.sh >> backups/backup.log 2>&1
 set -euo pipefail
 
-COMPOSE="docker compose -f docker-compose.prod.yml"
+COMPOSE="${COMPOSE:-docker compose -f docker-compose.prod.yml}"  # en el VPS compartido se indica el stack real con la variable COMPOSE
 DIR="${BACKUP_DIR:-backups}"
 KEEP_DAYS="${KEEP_DAYS:-14}"
 STAMP="$(date +%Y%m%d-%H%M%S)"

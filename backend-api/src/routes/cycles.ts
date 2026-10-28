@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import prisma from '../prisma';
 import { bid, requireBusiness } from '../auth';
-import { buildScenes, previewScenes, replaceScenes, starterScenes, validateScenes, SceneData, Template } from '../scenes';
+import { buildScenes, sceneStatus, previewScenes, replaceScenes, starterScenes, validateScenes, SceneData, Template } from '../scenes';
 
 const router = Router();
 router.use(requireBusiness);
@@ -121,7 +121,7 @@ router.get('/:id/preview', async (req, res) => {
   const businessId = bid(req);
   const cycle = await prisma.playlist.findFirst({
     where: { id: String(req.params.id), businessId },
-    include: { items: { where: { type: { not: 'legacy' } }, select: { id: true, enabled: true, duration: true } } }
+    include: { items: { where: { type: { not: 'legacy' } }, select: { id: true, enabled: true, duration: true, config: true } } }
   });
   if (!cycle) return res.status(404).json({ error: 'Ciclo no encontrado' });
 
@@ -131,7 +131,7 @@ router.get('/:id/preview', async (req, res) => {
     scenes: cycle.items.map((i) => {
       const s: any = byId.get(i.id);
       const count = !s ? 0 : s.items ? s.items.length : s.priceList ? s.priceList.items.length : 1;
-      return { id: i.id, enabled: i.enabled, shown: !!s, count };
+      return { id: i.id, enabled: i.enabled, shown: !!s, count, schedule: sceneStatus(i.config as Record<string, any>) };
     }),
     totalSeconds: shown.reduce((sum: number, s: any) => sum + s.duration, 0)
   });

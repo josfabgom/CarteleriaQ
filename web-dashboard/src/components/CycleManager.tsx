@@ -23,7 +23,7 @@ interface CycleSummary {
 interface ListLite { id: string; name: string; items: { category: string | null }[] }
 interface MediaLite { id: string; name: string; url: string; type: string }
 interface ProductLite { id: string; name: string; price: number; oldPrice: number | null; badge: string | null; category: string | null; available: boolean; image: { url: string } | null }
-interface PreviewScene { id: string; enabled: boolean; shown: boolean; count: number }
+interface PreviewScene { id: string; enabled: boolean; shown: boolean; count: number; schedule?: 'active' | 'scheduled' | 'expired' }
 
 const TYPE_INFO: Record<SceneType, { label: string; icon: string; color: string; bar: string }> = {
   prices: { label: 'Precios', icon: '💲', color: 'bg-blue-100 text-blue-800', bar: 'bg-blue-500' },
@@ -339,10 +339,25 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
                 <input type="checkbox" checked={s.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} /> Activa
               </label>
               <div className="flex gap-3 text-sm">
-                <button onClick={() => previewEdited([{ ...s, enabled: true }], `Vista previa: escena ${i + 1}`)} className="text-gray-700 hover:underline">👁 Ver</button>
+                <button onClick={() => previewEdited([{ ...s, enabled: true, config: { ...s.config, validFrom: undefined, validTo: undefined } }], `Vista previa: escena ${i + 1}`)} className="text-gray-700 hover:underline">👁 Ver</button>
                 <button onClick={() => setModal({ scene: JSON.parse(JSON.stringify(s)), isNew: false })} className="text-blue-600 hover:underline">Editar</button>
                 <button onClick={() => copyScene(i)} className="text-gray-600 hover:underline">Duplicar</button>
                 <button onClick={() => removeScene(i)} className="text-red-500 hover:underline">Quitar</button>
+              </div>
+              <div className="w-full flex flex-wrap items-center gap-3 text-sm text-gray-600 border-t pt-2">
+                <span title="Si no completás fechas, la escena se muestra siempre y se actualiza en el momento">📅 Vigencia:</span>
+                <label className="flex items-center gap-1">Desde
+                  <input type="datetime-local" value={s.config.validFrom ?? ''} onChange={(e) => patch(i, { config: { ...s.config, validFrom: e.target.value || undefined } })} className="border rounded p-1" />
+                </label>
+                <label className="flex items-center gap-1">Hasta
+                  <input type="datetime-local" value={s.config.validTo ?? ''} min={s.config.validFrom || undefined} onChange={(e) => patch(i, { config: { ...s.config, validTo: e.target.value || undefined } })} className="border rounded p-1" />
+                </label>
+                {(s.config.validFrom || s.config.validTo) && (
+                  <button onClick={() => patch(i, { config: { ...s.config, validFrom: undefined, validTo: undefined } })} className="text-gray-500 hover:underline">Quitar fechas</button>
+                )}
+                {st?.schedule === 'scheduled' && <span className="text-blue-600">⏳ Programada: todavía no se muestra</span>}
+                {st?.schedule === 'expired' && <span className="text-orange-600">⌛ Vencida: ya no se muestra</span>}
+                {!s.config.validFrom && !s.config.validTo && <span className="text-gray-400">Sin fechas: siempre visible</span>}
               </div>
             </div>
           );

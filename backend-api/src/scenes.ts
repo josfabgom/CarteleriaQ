@@ -45,6 +45,29 @@ const strList = (v: unknown, maxItems: number, maxLen: number, keepEmpty = false
   return out;
 };
 
+// ---------- Vigencia ----------
+
+// Las fechas se guardan como hora local "YYYY-MM-DDTHH:mm" (la del negocio, por defecto Argentina UTC-3, sin horario de verano).
+const TZ_OFFSET_MIN = Number(process.env.SCENE_TZ_OFFSET_MIN ?? -180);
+
+export function parseLocalDateTime(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const m = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/.exec(v.trim());
+  if (!m || Number.isNaN(Date.parse(`${m[1]}T${m[2]}:00Z`))) return null;
+  return `${m[1]}T${m[2]}`;
+}
+
+const nowLocal = () => new Date(Date.now() + TZ_OFFSET_MIN * 60_000).toISOString().slice(0, 16);
+
+// Sin fechas = siempre vigente. Inicio y fin inclusive (el fin vale hasta el final de ese minuto).
+export function sceneStatus(cfg: Record<string, any> | null | undefined): 'active' | 'scheduled' | 'expired' {
+  const from = parseLocalDateTime(cfg?.validFrom), to = parseLocalDateTime(cfg?.validTo);
+  const now = nowLocal();
+  if (from && now < from) return 'scheduled';
+  if (to && now > to) return 'expired';
+  return 'active';
+}
+
 // ---------- Validación ----------
 
 // Valida y normaliza la lista de escenas que envía el editor. Todo lo referenciado debe ser del negocio.
@@ -122,6 +145,17 @@ export async function validateScenes(businessId: string, input: unknown): Promis
         config: { title, subtitle: str(cfg.subtitle, 160), theme: TEXT_THEMES.includes(cfg.theme as string) ? (cfg.theme as string) : 'red' }
       });
     }
+  }
+
+  // Vigencia opcional de cada escena (la escena se muestra solo entre validFrom y validTo)
+  for (const [i, sc] of scenes.entries()) {
+    const rawCfg = (input[i]?.config && typeof input[i].config === 'object' ? input[i].config : {}) as Record<string, unknown>;
+    const from = parseLocalDateTime(rawCfg.validFrom), to = parseLocalDateTime(rawCfg.validTo);
+    if (rawCfg.validFrom && !from) return { error: `Escena ${i + 1}: la fecha de inicio no es válida.` };
+    if (rawCfg.validTo && !to) return { error: `Escena ${i + 1}: la fecha de fin no es válida.` };
+    if (from && to && to < from) return { error: `Escena ${i + 1}: la fecha de fin no puede ser anterior a la de inicio.` };
+    if (from) sc.config.validFrom = from;
+    if (to) sc.config.validTo = to;
   }
 
   // Lo referenciado debe pertenecer al negocio. Un id de OTRO negocio es un error; un id que ya no existe en ninguna parte
@@ -295,6 +329,7 @@ async function scenesFromItems(items: SceneRow[], businessId: string): Promise<R
   for (const it of items) {
     const cfg = (it.config ?? {}) as Record<string, any>;
     const head = { id: it.id, type: it.type, name: it.name, duration: it.duration };
+    if (sceneStatus(cfg) !== 'active') continue; // fuera de su fecha de inicio/fin
 
     if (it.type === 'prices' && it.priceList) {
       const categories: string[] = cfg.categories ?? [];
