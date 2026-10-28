@@ -10,6 +10,7 @@ import ProductManager from './components/ProductManager';
 import ScreenManager from './components/ScreenManager';
 import CycleManager from './components/CycleManager';
 import IntegrationManager from './components/IntegrationManager';
+import ScreenAlerts from './components/ScreenAlerts';
 
 const BUSINESS_NAV = [
   { id: 'dashboard', label: 'Inicio' },
@@ -134,6 +135,8 @@ const App = () => {
       {/* Contenido Principal */}
       <main className="flex-1 overflow-y-auto">
         <div className="p-8">
+
+          {!isAdmin && <ScreenAlerts onOpen={() => setActiveTab('pantallas')} />}
 
           {activeTab === 'negocios' && isAdmin && (
             <div>

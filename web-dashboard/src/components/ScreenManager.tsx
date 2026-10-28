@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_URL } from '../config';
 import { apiFetch } from '../api';
 import ScenePreview from './ScenePreview';
+import { fmtOffline } from './ScreenAlerts';
 
 const ScreenManager = ({ onEditCycle }: { onEditCycle?: (id: string) => void }) => {
   const [screens, setScreens] = useState<any[]>([]);
@@ -191,8 +192,13 @@ const ScreenManager = ({ onEditCycle }: { onEditCycle?: (id: string) => void }) 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {screens.map(screen => (
           <div key={screen.id} className="border border-gray-200 rounded-lg p-5 shadow-sm relative bg-white hover:border-blue-300 transition">
-            <div className={`absolute top-4 right-4 h-3 w-3 rounded-full ${screen.status === 'online' ? 'bg-green-500' : 'bg-gray-400'}`} title={screen.status}></div>
-            
+            <div className={`absolute top-4 right-4 h-3 w-3 rounded-full ${screen.status === 'online' ? 'bg-green-500' : screen.status === 'offline' ? 'bg-red-500' : 'bg-gray-400'}`} title={screen.status}></div>
+            {screen.status === 'offline' && (
+              <p className="text-xs text-red-600 font-medium mb-2">
+                {screen.lastSeenAt ? `Sin señal hace ${fmtOffline(Math.floor((Date.now() - new Date(screen.lastSeenAt).getTime()) / 60000))}` : 'Nunca se conectó'}
+              </p>
+            )}
+
             <h4 className="font-bold text-lg text-gray-800 mb-1 truncate pr-6">{screen.name}</h4>
             <p className="text-xs text-gray-500 font-mono mb-4 truncate">{screen.id}</p>
             

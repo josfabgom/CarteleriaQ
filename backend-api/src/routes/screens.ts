@@ -293,6 +293,26 @@ router.post('/:id/cycle', requireBusiness, async (req, res) => {
 });
 
 // Pantallas del negocio
+// Pantallas vinculadas que no dan señal hace más de ALERT_AFTER_MIN minutos (el panel lo muestra como alerta)
+const ALERT_AFTER_MIN = Number(process.env.SCREEN_ALERT_AFTER_MIN ?? 10);
+router.get('/alerts', requireBusiness, async (req, res) => {
+  try {
+    const screens = await prisma.screen.findMany({
+      where: { businessId: bid(req), status: { not: 'pending' } },
+      select: { id: true, name: true, location: true, lastSeenAt: true, createdAt: true },
+      orderBy: { createdAt: 'asc' }
+    });
+    const now = Date.now();
+    const down = screens
+      .map((s) => ({ ...s, minutes: Math.floor((now - (s.lastSeenAt ?? s.createdAt).getTime()) / 60000) }))
+      .filter((s) => s.minutes >= ALERT_AFTER_MIN)
+      .map((s) => ({ id: s.id, name: s.name, location: s.location, lastSeenAt: s.lastSeenAt, minutes: s.minutes, neverConnected: !s.lastSeenAt }));
+    res.json({ thresholdMinutes: ALERT_AFTER_MIN, total: screens.length, down });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching alerts' });
+  }
+});
+
 router.get('/', requireBusiness, async (req, res) => {
   try {
     const screens = await prisma.screen.findMany({
