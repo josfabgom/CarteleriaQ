@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit';
 import prisma from '../prisma';
 import { bid, randomToken, requireBusiness, requireScreenToken, sha256 } from '../auth';
 import { PRODUCT_WITH_IMAGE, resolveItems } from '../menu';
-import { MENU_STYLES, SceneData, buildScenes, replaceScenes } from '../scenes';
+import { MENU_STYLES, SceneData, TZ_OFFSET_MIN, buildScenes, replaceScenes } from '../scenes';
 
 const router = Router();
 
@@ -144,8 +144,11 @@ router.get('/:id/sync', requireScreenToken, async (req, res) => {
       )
     };
     // Las escenas del ciclo ya resueltas (las ofertas y las listas se calculan en vivo)
-    const scenes = await buildScenes(screen.playlistId, screen.businessId!);
-    res.json({ ...config, playlist, scenes });
+    // Las que aún no empezaron van aparte (los reproductores anteriores no las ven); los nuevos las activan por fecha
+    const all = await buildScenes(screen.playlistId, screen.businessId!, true);
+    const scenes = all.filter((s) => !s.scheduled);
+    const upcomingScenes = all.filter((s) => s.scheduled);
+    res.json({ ...config, playlist, scenes, upcomingScenes, sceneTzOffsetMin: TZ_OFFSET_MIN });
   } catch (error) {
     res.status(500).json({ error: 'Error syncing screen' });
   }

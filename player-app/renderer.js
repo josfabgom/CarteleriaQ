@@ -363,7 +363,7 @@ const collectMediaUrls = (config) => {
     if (entry.media) add(entry.media.url);
     for (const item of entry.priceList?.items || []) add(item.imageUrl);
   }
-  for (const scene of config.scenes || []) {
+  for (const scene of [...(config.scenes || []), ...(config.upcomingScenes || [])]) {
     if (scene.media && scene.media.url) add(scene.media.url);
     for (const m of Array.isArray(scene.media) ? scene.media : []) add(m.url);
     for (const m of scene.side || []) add(m.url);
@@ -700,13 +700,44 @@ function legacyScenes(screenData) {
   return media.map((m, i) => ({ id: 'legacy-' + i, type: 'media', duration: screenData.mediaDuration || 10, media: m }));
 }
 
+// Vigencia por fecha de cada escena, evaluada con el reloj de la TV: así se respeta aunque no haya conexión con el servidor.
+// Las fechas son hora local del negocio ("YYYY-MM-DDTHH:mm"); sceneTzOffsetMin la informa el servidor (por defecto UTC-3).
+function activeScenes(screenData) {
+  if (!screenData.scenes) return legacyScenes(screenData).filter(Boolean);
+  const all = [...screenData.scenes, ...(screenData.upcomingScenes || [])].filter(Boolean);
+  if (!all.some((s) => s.validFrom || s.validTo || s.scheduled || s.timeFrom || s.timeTo || (s.days && s.days.length))) return screenData.scenes.filter(Boolean);
+  const offset = Number.isFinite(screenData.sceneTzOffsetMin) ? screenData.sceneTzOffsetMin : -180;
+  const local = new Date(Date.now() + offset * 60000);
+  const now = local.toISOString().slice(0, 16);
+  const day = local.getUTCDay(); // 0 = domingo
+  const time = now.slice(11);
+  const inTime = (s) => {
+    if (!s.timeFrom && !s.timeTo) return true;
+    const a = s.timeFrom || '00:00', b = s.timeTo || '23:59';
+    return a <= b ? time >= a && time <= b : time >= a || time <= b; // desde > hasta: cruza la medianoche
+  };
+  return all
+    .filter((s) => (!s.validFrom || now >= s.validFrom) && (!s.validTo || now <= s.validTo) && (!s.days || !s.days.length || s.days.includes(day)) && inTime(s))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+let sceneWatchTimer = null;
+
 function startPlayer(screenData) {
   const previousScene = currentSceneId;
   currentSyncData = screenData;
   stopScenes();
 
-  const scenes = (screenData.scenes || legacyScenes(screenData)).filter(Boolean);
+  const scenes = activeScenes(screenData);
   previewScenes = scenes;
+  // Cada 20 s se revisa si alguna escena empezó o venció; si cambió la lista, se reinicia desde la escena actual
+  if (sceneWatchTimer) clearInterval(sceneWatchTimer);
+  const signature = scenes.map((s) => s.id).join('|');
+  if (!PREVIEW) {
+    sceneWatchTimer = setInterval(() => {
+      if (currentSyncData === screenData && activeScenes(screenData).map((s) => s.id).join('|') !== signature) startPlayer(screenData);
+    }, 20000);
+  }
   if (scenes.length === 0) {
     currentSceneId = null;
     renderIdle(screenData);

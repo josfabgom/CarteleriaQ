@@ -48,7 +48,7 @@ const strList = (v: unknown, maxItems: number, maxLen: number, keepEmpty = false
 // ---------- Vigencia ----------
 
 // Las fechas se guardan como hora local "YYYY-MM-DDTHH:mm" (la del negocio, por defecto Argentina UTC-3, sin horario de verano).
-const TZ_OFFSET_MIN = Number(process.env.SCENE_TZ_OFFSET_MIN ?? -180);
+export const TZ_OFFSET_MIN = Number(process.env.SCENE_TZ_OFFSET_MIN ?? -180);
 
 export function parseLocalDateTime(v: unknown): string | null {
   if (typeof v !== 'string') return null;
@@ -59,12 +59,26 @@ export function parseLocalDateTime(v: unknown): string | null {
 
 const nowLocal = () => new Date(Date.now() + TZ_OFFSET_MIN * 60_000).toISOString().slice(0, 16);
 
-// Sin fechas = siempre vigente. Inicio y fin inclusive (el fin vale hasta el final de ese minuto).
+// Días de la semana (0 = domingo … 6 = sábado) y franja horaria opcionales: la escena se repite cada semana en esos momentos.
+export const parseTime = (v: unknown): string | null => (typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v.trim()) ? v.trim() : null);
+export const parseDays = (v: unknown): number[] =>
+  Array.isArray(v) ? [...new Set(v.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort() : [];
+
+// Sin reglas = siempre vigente. Inicio y fin inclusive. 'scheduled' = todavía no (o fuera de su día/horario, vuelve sola); 'expired' = ya pasó su fecha de fin.
 export function sceneStatus(cfg: Record<string, any> | null | undefined): 'active' | 'scheduled' | 'expired' {
   const from = parseLocalDateTime(cfg?.validFrom), to = parseLocalDateTime(cfg?.validTo);
   const now = nowLocal();
-  if (from && now < from) return 'scheduled';
   if (to && now > to) return 'expired';
+  if (from && now < from) return 'scheduled';
+  const days = parseDays(cfg?.days);
+  if (days.length && !days.includes(new Date(Date.now() + TZ_OFFSET_MIN * 60_000).getUTCDay())) return 'scheduled';
+  const tFrom = parseTime(cfg?.timeFrom), tTo = parseTime(cfg?.timeTo);
+  if (tFrom || tTo) {
+    const t = now.slice(11);
+    const a = tFrom ?? '00:00', b = tTo ?? '23:59';
+    const inside = a <= b ? t >= a && t <= b : t >= a || t <= b; // desde > hasta: cruza la medianoche (ej. 22:00 a 02:00)
+    if (!inside) return 'scheduled';
+  }
   return 'active';
 }
 
@@ -154,6 +168,13 @@ export async function validateScenes(businessId: string, input: unknown): Promis
     if (rawCfg.validFrom && !from) return { error: `Escena ${i + 1}: la fecha de inicio no es válida.` };
     if (rawCfg.validTo && !to) return { error: `Escena ${i + 1}: la fecha de fin no es válida.` };
     if (from && to && to < from) return { error: `Escena ${i + 1}: la fecha de fin no puede ser anterior a la de inicio.` };
+    const days = parseDays(rawCfg.days);
+    if (rawCfg.days != null && !Array.isArray(rawCfg.days)) return { error: `Escena ${i + 1}: los días no son válidos.` };
+    const tFrom = parseTime(rawCfg.timeFrom), tTo = parseTime(rawCfg.timeTo);
+    if ((rawCfg.timeFrom && !tFrom) || (rawCfg.timeTo && !tTo)) return { error: `Escena ${i + 1}: el horario no es válido (usá HH:MM).` };
+    if (days.length && days.length < 7) sc.config.days = days;
+    if (tFrom) sc.config.timeFrom = tFrom;
+    if (tTo) sc.config.timeTo = tTo;
     if (from) sc.config.validFrom = from;
     if (to) sc.config.validTo = to;
   }
@@ -272,7 +293,8 @@ async function loadOffers(businessId: string, source: string, productIds: string
   return products.map((p, i) => ({ ...resolveItem({ id: p.id, productId: p.id, product: p, order: i }), discountPercent: discountOf(p) }));
 }
 
-export async function buildScenes(playlistId: string | null, businessId: string): Promise<Record<string, unknown>[]> {
+// withScheduled: incluye también las escenas aún no vigentes (marcadas scheduled) para que la TV las active sola sin conexión
+export async function buildScenes(playlistId: string | null, businessId: string, withScheduled = false): Promise<Record<string, unknown>[]> {
   if (!playlistId) return [];
   const items = await prisma.playlistItem.findMany({
     where: { playlistId, enabled: true, type: { not: 'legacy' } },
@@ -283,7 +305,7 @@ export async function buildScenes(playlistId: string | null, businessId: string)
     }
   });
 
-  return scenesFromItems(items as unknown as SceneRow[], businessId);
+  return scenesFromItems(items as unknown as SceneRow[], businessId, withScheduled);
 }
 
 // Lo que necesita armar una escena: la fila del ciclo con su archivo y su lista de precios ya cargados
@@ -324,12 +346,22 @@ export async function previewScenes(businessId: string, scenes: SceneData[]): Pr
   return scenesFromItems(rows, businessId);
 }
 
-async function scenesFromItems(items: SceneRow[], businessId: string): Promise<Record<string, unknown>[]> {
+async function scenesFromItems(items: SceneRow[], businessId: string, withScheduled = false): Promise<Record<string, unknown>[]> {
   const out: Record<string, unknown>[] = [];
-  for (const it of items) {
+  for (const [order, it] of items.entries()) {
     const cfg = (it.config ?? {}) as Record<string, any>;
-    const head = { id: it.id, type: it.type, name: it.name, duration: it.duration };
-    if (sceneStatus(cfg) !== 'active') continue; // fuera de su fecha de inicio/fin
+    // order y fechas viajan con la escena: la TV las vuelve a evaluar con su reloj y respeta la vigencia aunque se corte internet
+    const status = sceneStatus(cfg);
+    if (status === 'expired' || (status === 'scheduled' && !withScheduled)) continue;
+    const head = {
+      id: it.id, type: it.type, name: it.name, duration: it.duration, order,
+      ...(cfg.validFrom ? { validFrom: cfg.validFrom } : {}),
+      ...(cfg.validTo ? { validTo: cfg.validTo } : {}),
+      ...(Array.isArray(cfg.days) && cfg.days.length ? { days: cfg.days } : {}),
+      ...(cfg.timeFrom ? { timeFrom: cfg.timeFrom } : {}),
+      ...(cfg.timeTo ? { timeTo: cfg.timeTo } : {}),
+      ...(status === 'scheduled' ? { scheduled: true } : {})
+    };
 
     if (it.type === 'prices' && it.priceList) {
       const categories: string[] = cfg.categories ?? [];

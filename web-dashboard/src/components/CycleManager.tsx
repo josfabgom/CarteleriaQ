@@ -25,6 +25,8 @@ interface MediaLite { id: string; name: string; url: string; type: string }
 interface ProductLite { id: string; name: string; price: number; oldPrice: number | null; badge: string | null; category: string | null; available: boolean; image: { url: string } | null }
 interface PreviewScene { id: string; enabled: boolean; shown: boolean; count: number; schedule?: 'active' | 'scheduled' | 'expired' }
 
+const DAY_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S']; // 0 = domingo
+
 const TYPE_INFO: Record<SceneType, { label: string; icon: string; color: string; bar: string }> = {
   prices: { label: 'Precios', icon: '💲', color: 'bg-blue-100 text-blue-800', bar: 'bg-blue-500' },
   offers: { label: 'Ofertas', icon: '🔥', color: 'bg-red-100 text-red-800', bar: 'bg-red-500' },
@@ -339,7 +341,7 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
                 <input type="checkbox" checked={s.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} /> Activa
               </label>
               <div className="flex gap-3 text-sm">
-                <button onClick={() => previewEdited([{ ...s, enabled: true, config: { ...s.config, validFrom: undefined, validTo: undefined } }], `Vista previa: escena ${i + 1}`)} className="text-gray-700 hover:underline">👁 Ver</button>
+                <button onClick={() => previewEdited([{ ...s, enabled: true, config: { ...s.config, validFrom: undefined, validTo: undefined, days: undefined, timeFrom: undefined, timeTo: undefined } }], `Vista previa: escena ${i + 1}`)} className="text-gray-700 hover:underline">👁 Ver</button>
                 <button onClick={() => setModal({ scene: JSON.parse(JSON.stringify(s)), isNew: false })} className="text-blue-600 hover:underline">Editar</button>
                 <button onClick={() => copyScene(i)} className="text-gray-600 hover:underline">Duplicar</button>
                 <button onClick={() => removeScene(i)} className="text-red-500 hover:underline">Quitar</button>
@@ -352,12 +354,30 @@ const CycleManager = ({ openCycleId, onOpened }: { openCycleId?: string | null; 
                 <label className="flex items-center gap-1">Hasta
                   <input type="datetime-local" value={s.config.validTo ?? ''} min={s.config.validFrom || undefined} onChange={(e) => patch(i, { config: { ...s.config, validTo: e.target.value || undefined } })} className="border rounded p-1" />
                 </label>
-                {(s.config.validFrom || s.config.validTo) && (
-                  <button onClick={() => patch(i, { config: { ...s.config, validFrom: undefined, validTo: undefined } })} className="text-gray-500 hover:underline">Quitar fechas</button>
+                {(s.config.validFrom || s.config.validTo || s.config.timeFrom || s.config.timeTo || (s.config.days ?? []).length > 0) && (
+                  <button onClick={() => patch(i, { config: { ...s.config, validFrom: undefined, validTo: undefined, days: undefined, timeFrom: undefined, timeTo: undefined } })} className="text-gray-500 hover:underline">Quitar vigencia</button>
                 )}
-                {st?.schedule === 'scheduled' && <span className="text-blue-600">⏳ Programada: todavía no se muestra</span>}
+                <span className="flex items-center gap-1" title="Días en que se muestra. Sin marcar = todos los días">
+                  {DAY_LABELS.map((lbl, d) => {
+                    const on = (s.config.days ?? []).includes(d);
+                    return (
+                      <button key={d} type="button" onClick={() => {
+                        const cur: number[] = s.config.days ?? [];
+                        const next = on ? cur.filter((x) => x !== d) : [...cur, d].sort();
+                        patch(i, { config: { ...s.config, days: next.length ? next : undefined } });
+                      }} className={`w-7 h-7 rounded text-xs font-semibold border ${on ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600'}`}>{lbl}</button>
+                    );
+                  })}
+                </span>
+                <label className="flex items-center gap-1" title="Horario del día. Si 'de' es mayor que 'a', cruza la medianoche">De
+                  <input type="time" value={s.config.timeFrom ?? ''} onChange={(e) => patch(i, { config: { ...s.config, timeFrom: e.target.value || undefined } })} className="border rounded p-1" />
+                </label>
+                <label className="flex items-center gap-1">a
+                  <input type="time" value={s.config.timeTo ?? ''} onChange={(e) => patch(i, { config: { ...s.config, timeTo: e.target.value || undefined } })} className="border rounded p-1" />
+                </label>
+                {st?.schedule === 'scheduled' && <span className="text-blue-600">⏳ Fuera de fecha, día u horario: ahora no se muestra</span>}
                 {st?.schedule === 'expired' && <span className="text-orange-600">⌛ Vencida: ya no se muestra</span>}
-                {!s.config.validFrom && !s.config.validTo && <span className="text-gray-400">Sin fechas: siempre visible</span>}
+                {!s.config.validFrom && !s.config.validTo && !s.config.timeFrom && !s.config.timeTo && !(s.config.days ?? []).length && <span className="text-gray-400">Sin restricciones: siempre visible</span>}
               </div>
             </div>
           );
